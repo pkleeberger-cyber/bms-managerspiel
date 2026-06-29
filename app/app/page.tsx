@@ -1,65 +1,172 @@
-import Image from "next/image";
+import Link from "next/link";
 
-export default function Home() {
+import { DashboardCard } from "@/components/ui/dashboard-card";
+import { Icon } from "@/components/icons";
+
+const newsItems = [
+  {
+    category: "Liga",
+    title: "Der 19. Spieltag steht vor der Tür",
+    time: "vor 2 Stunden",
+  },
+  {
+    category: "Markt",
+    title: "Transferfenster schließt am Freitag",
+    time: "vor 5 Stunden",
+  },
+  {
+    category: "BMS",
+    title: "Auswertung des letzten Spieltags",
+    time: "gestern",
+  },
+];
+
+export default function DashboardPage() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <>
+      <div className="page-heading">
+        <div>
+          <p className="eyebrow">Mein Team · Übersicht</p>
+          <h1>Guten Morgen, Patrick.</h1>
+          <p>Hier ist dein Überblick für den 19. Spieltag.</p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+        <div className="season-chip">
+          <span>Transferphase</span>
+          <strong>Noch 3 Tage</strong>
         </div>
-      </main>
-    </div>
+      </div>
+
+      <div className="dashboard-grid">
+        <DashboardCard title="Budget" eyebrow="Verfügbar" icon="coins">
+          <p className="metric-value">8,75 Mio. €</p>
+          <div className="metric-footer">
+            <span className="positive">+1,20 Mio. €</span>
+            <span>seit Saisonstart</span>
+          </div>
+        </DashboardCard>
+
+        <DashboardCard title="Kaderwert" eyebrow="Aktuell" icon="chart">
+          <p className="metric-value">76,40 Mio. €</p>
+          <div className="metric-footer">
+            <span className="positive">+2,8 %</span>
+            <span>zum letzten Spieltag</span>
+          </div>
+        </DashboardCard>
+
+        <DashboardCard title="Ligaposition" eyebrow="Erste Liga" icon="trophy">
+          <div className="position-value">
+            <strong>3.</strong>
+            <div>
+              <span>34 Punkte</span>
+              <small>3 Punkte hinter Platz 2</small>
+            </div>
+          </div>
+          <div className="position-track">
+            <span style={{ width: "72%" }} />
+          </div>
+        </DashboardCard>
+
+        <DashboardCard
+          title="Nächstes Spiel"
+          eyebrow="Samstag · 15:30"
+          icon="calendar"
+          className="match-card"
+        >
+          <div className="matchup">
+            <div className="club">
+              <span className="mini-logo home">PM</span>
+              <strong>Patrick</strong>
+            </div>
+            <div className="match-center">
+              <span>19. Spieltag</span>
+              <strong>VS</strong>
+              <small>In 4 Tagen</small>
+            </div>
+            <div className="club">
+              <span className="mini-logo away">FB</span>
+              <strong>FC Bayern Manager</strong>
+            </div>
+          </div>
+        </DashboardCard>
+
+        <DashboardCard
+          title="Letztes Spiel"
+          eyebrow="18. Spieltag"
+          icon="shield"
+          className="last-match-card"
+        >
+          <div className="last-match">
+            <div>
+              <span>Patrick</span>
+              <strong>57</strong>
+            </div>
+            <span className="result-pill">Sieg</span>
+            <div>
+              <span>Ruhrpott XI</span>
+              <strong>42</strong>
+            </div>
+          </div>
+          <p className="match-note">Starke 15 Punkte Vorsprung am vergangenen Wochenende.</p>
+        </DashboardCard>
+
+        <DashboardCard
+          title="Aktuelle Meldungen"
+          eyebrow="News"
+          icon="news"
+          className="news-card"
+        >
+          <div className="news-list">
+            {newsItems.map((item) => (
+              <article key={item.title}>
+                <span>{item.category}</span>
+                <div>
+                  <h3>{item.title}</h3>
+                  <time>{item.time}</time>
+                </div>
+                <Icon name="chevron" />
+              </article>
+            ))}
+          </div>
+          <Link className="card-link" href="/news">
+            Alle Meldungen
+            <Icon name="arrow" />
+          </Link>
+        </DashboardCard>
+
+        <DashboardCard
+          title="Schnellzugriff"
+          eyebrow="Aktionen"
+          icon="spark"
+          className="actions-card"
+        >
+          <div className="quick-actions">
+            <Link href="/team/squad">
+              <Icon name="team" />
+              <span>
+                <strong>Kader ansehen</strong>
+                <small>25 Spieler im Kader</small>
+              </span>
+              <Icon name="chevron" />
+            </Link>
+            <Link href="/team/transfers">
+              <Icon name="coins" />
+              <span>
+                <strong>Transfermarkt</strong>
+                <small>Spieler suchen</small>
+              </span>
+              <Icon name="chevron" />
+            </Link>
+            <Link href="/competitions/erste-liga">
+              <Icon name="chart" />
+              <span>
+                <strong>Ligatabelle</strong>
+                <small>Aktueller Spieltag</small>
+              </span>
+              <Icon name="chevron" />
+            </Link>
+          </div>
+        </DashboardCard>
+      </div>
+    </>
   );
 }
