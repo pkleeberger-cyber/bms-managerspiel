@@ -64,7 +64,7 @@ export function ManagerHeader() {
           <div className="next-match-compact">
             <span className="header-label">Nächstes Spiel</span>
             <strong>vs FC Bayern Manager</strong>
-            <small>Sa., 15:30 · 19. Spieltag</small>
+            <small>19. Spieltag · Auswärts</small>
           </div>
         </div>
       </div>

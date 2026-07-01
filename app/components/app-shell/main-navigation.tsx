@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { mainNavigation } from "@/components/app-shell/navigation-config";
 
 function isActive(pathname: string, href: string): boolean {
-  if (href === "/") {
+  if (href === "/" || href === "/team/overview") {
     return pathname === "/" || pathname.startsWith("/team");
   }
 

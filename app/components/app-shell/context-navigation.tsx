@@ -36,6 +36,10 @@ export function ContextNavigation() {
   const pathname = usePathname();
   const context = getContext(pathname);
 
+  if (pathname === "/" || pathname.startsWith("/team")) {
+    return null;
+  }
+
   return (
     <nav className="context-navigation" aria-label={`${context.title} Navigation`}>
       <div className="context-inner">
