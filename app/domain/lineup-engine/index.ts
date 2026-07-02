@@ -18,6 +18,10 @@ export {
   sumPointBreakdown,
 } from "./scoring";
 export {
+  createDefaultCompetitionScoringConfig,
+  pokalRoundsOneAndTwoScoringConfig,
+} from "./scoring-config";
+export {
   SquadResolutionError,
   getEffectiveSquad,
 } from "./squad-resolver";

@@ -2,15 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { CockpitSection } from "@/components/cockpit/cockpit-section";
-import { ManagerCockpit } from "@/components/cockpit/manager-cockpit";
 import { PlaceholderPage } from "@/components/placeholder-page";
 
 const sections = {
-  overview: {
-    title: "Übersicht",
-    description: "Die Teamübersicht ist aktuell über das Cockpit erreichbar.",
-    icon: "chart",
-  },
   squad: {
     title: "Kader",
     description: "Die Kaderübersicht wird in einem zukünftigen Sprint ergänzt.",
@@ -20,11 +14,6 @@ const sections = {
     title: "Kader",
     description: "Die Kaderübersicht wird in einem zukünftigen Sprint ergänzt.",
     icon: "team",
-  },
-  transfers: {
-    title: "Transfers",
-    description: "Der Transferbereich wird in einem zukünftigen Sprint ergänzt.",
-    icon: "coins",
   },
   matches: {
     title: "Spiele",
@@ -346,10 +335,6 @@ export default async function TeamSectionPage({
 
   if (!page) {
     notFound();
-  }
-
-  if (section === "overview") {
-    return <ManagerCockpit />;
   }
 
   if (section === "squad" || section === "kader") {

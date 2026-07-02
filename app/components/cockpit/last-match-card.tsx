@@ -1,39 +1,51 @@
 import Link from "next/link";
 
 import { Icon } from "@/components/icons";
+import type { TeamOverviewData } from "@/domain/team-overview";
 
-export function LastMatchCard() {
+const resultLabels: Record<TeamOverviewData["lastMatch"]["result"], string> = {
+  WIN: "Sieg",
+  DRAW: "Unentschieden",
+  LOSS: "Niederlage",
+};
+
+export function LastMatchCard({
+  competitionId,
+  lastMatch,
+  matchday,
+}: Pick<TeamOverviewData, "competitionId" | "lastMatch" | "matchday">) {
   return (
     <article className="cockpit-match-card">
       <div className="match-score-panel">
         <div className="match-story-meta">
-          <strong className="result-state">Niederlage</strong>
-          <span>Erste Liga · 14. Spieltag</span>
+          <strong className="result-state">{resultLabels[lastMatch.result]}</strong>
+          <span>{competitionId} · {matchday}. Spieltag</span>
+          {lastMatch.officialResultAdjusted ? (
+            <span className="analysis-status-badge">Offizielles Ergebnis angepasst</span>
+          ) : null}
         </div>
 
         <div className="cockpit-score">
           <div className="score-team">
-            <span className="score-logo home">BU</span>
             <div>
-              <strong>BMS United</strong>
+              <strong>{lastMatch.homeTeamName}</strong>
             </div>
           </div>
           <div className="score-result">
-            <strong>8</strong>
+            <strong>{lastMatch.homeScore}</strong>
             <span>:</span>
-            <strong>10</strong>
+            <strong>{lastMatch.awayScore}</strong>
           </div>
           <div className="score-team away">
-            <span className="score-logo opponent">FA</span>
             <div>
-              <strong>FC Adler</strong>
+              <strong>{lastMatch.awayTeamName}</strong>
             </div>
           </div>
         </div>
 
       </div>
-      <Link className="analyse-button" href="/team/spiele/14/analyse">
-        Analyse Match
+      <Link className="analyse-button" href={lastMatch.href}>
+        Match analysieren
         <Icon name="arrow" />
       </Link>
     </article>

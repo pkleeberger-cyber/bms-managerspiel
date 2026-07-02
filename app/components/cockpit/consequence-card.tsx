@@ -5,7 +5,7 @@ type ConsequenceCardProps = {
   referenceLabel: string;
   change: string;
   insight: string;
-  direction: "up" | "down";
+  direction: "up" | "down" | "neutral";
 };
 
 export function ConsequenceCard({
@@ -23,7 +23,7 @@ export function ConsequenceCard({
       <div className="consequence-current">
         <strong>{current}</strong>
         <span className="consequence-delta">
-          {direction === "up" ? "▲" : "▼"} {change}
+          {direction === "up" ? "▲" : direction === "down" ? "▼" : "–"} {change}
         </span>
       </div>
       <div className="consequence-reference">

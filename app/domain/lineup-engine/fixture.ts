@@ -1,4 +1,5 @@
 import { calculateMatchLineup } from "./lineup-engine";
+import { createDefaultCompetitionScoringConfig } from "./scoring-config";
 import { getEffectiveSquad } from "./squad-resolver";
 import type {
   ManagerMatchdayPenalty,
@@ -142,6 +143,17 @@ export const lineupEngineFixtureResult = calculateMatchLineup({
   penalties: lineupEngineFixturePenalties,
 });
 
+const explicitDefaultConfigResult = calculateMatchLineup({
+  managerId,
+  competitionId,
+  matchday: 7,
+  teamValidity: "VALID",
+  assignments: lineupEngineFixtureAssignments,
+  matchData: lineupEngineFixtureMatchData,
+  penalties: lineupEngineFixturePenalties,
+  scoringConfig: createDefaultCompetitionScoringConfig(competitionId),
+});
+
 export const invalidTeamFixtureResult = calculateMatchLineup({
   managerId,
   competitionId,
@@ -171,6 +183,9 @@ export const lineupEngineFixtureProof = {
     lineupEngineFixtureResult.team.playerPoints === 55
     && lineupEngineFixtureResult.team.manualPenaltyPoints === -3
     && lineupEngineFixtureResult.team.totalPoints === 52,
+  explicitDefaultPreservesLeagueScoring:
+    JSON.stringify(explicitDefaultConfigResult)
+      === JSON.stringify(lineupEngineFixtureResult),
   invalidTeamIsNotCalculated: invalidTeamFixtureResult.calculationStatus === "SKIPPED_INVALID_TEAM"
     && invalidTeamFixtureResult.team === null,
 } as const;

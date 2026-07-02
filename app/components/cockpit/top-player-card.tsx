@@ -3,7 +3,10 @@ type TopPlayerCardProps = {
   position: string;
   initials: string;
   points: number;
-  seasonAverage: number;
+  detailLabel: string;
+  detailValue: string;
+  tone: "positive" | "negative" | "neutral";
+  status: string;
 };
 
 export function TopPlayerCard({
@@ -11,11 +14,11 @@ export function TopPlayerCard({
   position,
   initials,
   points,
-  seasonAverage,
+  detailLabel,
+  detailValue,
+  tone,
+  status,
 }: TopPlayerCardProps) {
-  const difference = points - seasonAverage;
-  const positive = difference >= 0;
-
   return (
     <article className="top-player-card">
       <span className="top-player-avatar">{initials}</span>
@@ -28,12 +31,12 @@ export function TopPlayerCard({
         <span>Punkte</span>
       </div>
       <div className="top-player-average">
-        <span>Saison-Ø</span>
-        <strong>{seasonAverage.toFixed(1)}</strong>
+        <span>{detailLabel}</span>
+        <strong>{detailValue}</strong>
       </div>
-      <span className={`top-player-trend ${positive ? "positive" : "negative"}`}>
-        {positive ? "▲" : "▼"} {positive ? "+" : ""}
-        {difference.toFixed(1)}
+      <span className={`top-player-trend ${tone}`}>
+        {tone === "positive" ? "▲" : tone === "negative" ? "▼" : "–"}{" "}
+        {status}
       </span>
     </article>
   );

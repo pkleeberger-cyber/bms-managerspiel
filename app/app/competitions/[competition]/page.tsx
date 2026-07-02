@@ -3,8 +3,11 @@ import { notFound } from "next/navigation";
 import { Fragment } from "react";
 import type { ReactNode } from "react";
 
-import { generateLeagueEvents, getHeroEvent } from "@/services/event-engine";
-import type { LeagueFixtureInput } from "@/services/event-engine";
+import {
+  officialCompetitionExcelFixture,
+  secondLeagueCompetitionFixture,
+} from "@/domain/competition-overview/fixture";
+import type { OfficialCompetitionOverview } from "@/domain/competition-overview";
 import type { BmsEvent } from "@/types/events";
 
 const competitions = {
@@ -21,8 +24,10 @@ type FormResult = "W" | "D" | "L";
 type Fixture = {
   home: string;
   homeManager: string;
+  homeTeamId?: string;
   away: string;
   awayManager: string;
+  awayTeamId?: string;
   result: string;
   status: string;
   href?: string;
@@ -34,6 +39,7 @@ type MatchdayEventBadge = {
 };
 
 type Standing = {
+  teamId?: string;
   rank: number;
   club: string;
   manager: string;
@@ -67,46 +73,6 @@ type TensionZone = {
   context: string;
 };
 
-const leagueFixtures: Fixture[] = [
-  { home: "FC Adler", homeManager: "Adler Manager", away: "BMS United", awayManager: "Patrick", result: "10 : 8", status: "Ausgewertet", href: "/team/spiele/14/analyse" },
-  { home: "Borussia", homeManager: "Borussia Manager", away: "Köln", awayManager: "Köln Manager", result: "11 : 7", status: "Ausgewertet", href: "/team/spiele/14/analyse" },
-  { home: "Hamburg", homeManager: "Hamburg Manager", away: "Bochum", awayManager: "Bochum Manager", result: "6 : 13", status: "Ausgewertet", href: "/team/spiele/14/analyse" },
-  { home: "Mainz", homeManager: "Mainz Manager", away: "Bremen", awayManager: "Bremen Manager", result: "9 : 9", status: "Ausgewertet", href: "/team/spiele/14/analyse" },
-  { home: "München", homeManager: "Bayern Manager", away: "Stuttgart", awayManager: "Stuttgart Manager", result: "12 : 10", status: "Ausgewertet", href: "/team/spiele/14/analyse" },
-  { home: "Leipzig", homeManager: "Leipzig Manager", away: "Freiburg", awayManager: "Freiburg Manager", result: "7 : 7", status: "Ausgewertet", href: "/team/spiele/14/analyse" },
-];
-
-const secondLeagueFixtures: Fixture[] = [
-  { home: "Dresden", homeManager: "Dresden Manager", away: "Nürnberg", awayManager: "Nürnberg Manager", result: "8 : 6", status: "Ausgewertet", href: "/team/spiele/14/analyse" },
-  { home: "Hannover", homeManager: "Hannover Manager", away: "Kiel", awayManager: "Kiel Manager", result: "12 : 12", status: "Ausgewertet", href: "/team/spiele/14/analyse" },
-  { home: "Essen", homeManager: "Essen Manager", away: "Karlsruhe", awayManager: "Karlsruhe Manager", result: "9 : 11", status: "Ausgewertet", href: "/team/spiele/14/analyse" },
-  { home: "Aachen", homeManager: "Aachen Manager", away: "Ulm", awayManager: "Ulm Manager", result: "7 : 5", status: "Ausgewertet", href: "/team/spiele/14/analyse" },
-];
-
-const leagueStandings: Standing[] = [
-  { rank: 1, club: "FC Adler", manager: "Adler Manager", played: 14, goals: "858:721", points: 36, form: ["W", "W", "D", "W", "W"], zone: "leader" },
-  { rank: 2, club: "Borussia", manager: "Borussia Manager", played: 14, goals: "834:744", points: 35, form: ["W", "L", "W", "W", "W"], zone: "international" },
-  { rank: 3, club: "BMS United", manager: "Patrick", played: 14, goals: "812:745", points: 34, form: ["W", "W", "D", "L", "W"], zone: "international" },
-  { rank: 4, club: "Bochum", manager: "Bochum Manager", played: 14, goals: "805:762", points: 32, form: ["L", "W", "W", "W", "W"], zone: "international" },
-  { rank: 5, club: "München", manager: "Bayern Manager", played: 14, goals: "798:770", points: 29, form: ["D", "W", "L", "W", "W"], zone: "neutral" },
-  { rank: 6, club: "Freiburg", manager: "Freiburg Manager", played: 14, goals: "776:781", points: 24, form: ["W", "D", "L", "D", "D"], zone: "neutral" },
-  { rank: 7, club: "Mainz", manager: "Mainz Manager", played: 14, goals: "743:790", points: 19, form: ["L", "D", "W", "L", "D"], zone: "neutral" },
-  { rank: 8, club: "Bremen", manager: "Bremen Manager", played: 14, goals: "731:806", points: 18, form: ["D", "L", "L", "W", "D"], zone: "neutral" },
-  { rank: 9, club: "Köln", manager: "Köln Manager", played: 14, goals: "709:831", points: 13, form: ["L", "L", "W", "L", "L"], zone: "relegation" },
-  { rank: 10, club: "Hamburg", manager: "Hamburg Manager", played: 14, goals: "692:848", points: 11, form: ["L", "D", "L", "L", "L"], zone: "bottom" },
-];
-
-const secondLeagueStandings: Standing[] = [
-  { rank: 1, club: "Dresden", manager: "Dresden Manager", played: 14, goals: "801:702", points: 34, form: ["W", "W", "W", "D", "W"], zone: "leader" },
-  { rank: 2, club: "Karlsruhe", manager: "Karlsruhe Manager", played: 14, goals: "782:733", points: 31, form: ["W", "D", "L", "W", "W"], zone: "international" },
-  { rank: 3, club: "Aachen", manager: "Aachen Manager", played: 14, goals: "769:745", points: 29, form: ["D", "W", "W", "L", "W"], zone: "international" },
-  { rank: 4, club: "Hannover", manager: "Hannover Manager", played: 14, goals: "748:746", points: 26, form: ["L", "W", "D", "W", "D"], zone: "neutral" },
-  { rank: 5, club: "Nürnberg", manager: "Nürnberg Manager", played: 14, goals: "722:759", points: 19, form: ["W", "L", "L", "D", "L"], zone: "neutral" },
-  { rank: 6, club: "Kiel", manager: "Kiel Manager", played: 14, goals: "711:781", points: 17, form: ["D", "L", "W", "D", "L"], zone: "neutral" },
-  { rank: 7, club: "Essen", manager: "Essen Manager", played: 14, goals: "695:801", points: 13, form: ["L", "L", "D", "L", "L"], zone: "relegation" },
-  { rank: 8, club: "Ulm", manager: "Ulm Manager", played: 14, goals: "682:824", points: 10, form: ["L", "D", "L", "L", "L"], zone: "bottom" },
-];
-
 const europeanFixtures: Fixture[] = [
   { home: "Adler Europa", homeManager: "Adler Manager", away: "Bochum Europe", awayManager: "Bochum Manager", result: "9 : 8", status: "Ausgewertet" },
   { home: "Borussia Europe", homeManager: "Borussia Manager", away: "Freiburg Europe", awayManager: "Freiburg Manager", result: "10 : 10", status: "Ausgewertet" },
@@ -122,13 +88,6 @@ const europeanTable: Standing[] = [
   { rank: 5, club: "Bochum Europe", manager: "Bochum Manager", played: 5, goals: "281:288", points: 7, form: ["W", "L", "W", "D", "L"], zone: "chasing" },
   { rank: 6, club: "Freiburg Europe", manager: "Freiburg Manager", played: 5, goals: "270:292", points: 5, form: ["D", "L", "W", "L", "D"], zone: "neutral" },
 ];
-
-const leaderboards = [
-  { label: "Beste Offensive", value: "FC Adler", detail: "858 Tore" },
-  { label: "Beste Defensive", value: "FC Adler", detail: "721 Gegentore" },
-  { label: "Höchster Spieltag", value: "Bochum", detail: "13 Tore" },
-  { label: "Längste Siegesserie", value: "Bochum", detail: "4 Siege" },
-] as const;
 
 const cupFixtures: Fixture[] = [
   { home: "FC Adler", homeManager: "Adler Manager", away: "Mainz", awayManager: "Mainz Manager", result: "–", status: "Ausgelost" },
@@ -174,12 +133,8 @@ function getTeamId(club: string): string {
     .replace(/(^-|-$)/g, "");
 }
 
-function getManagerId(manager: string): string {
-  return getTeamId(manager);
-}
-
 function getStandingByTeamId(standings: Standing[], teamId: string): Standing | undefined {
-  return standings.find((team) => getTeamId(team.club) === teamId);
+  return standings.find((team) => (team.teamId ?? getTeamId(team.club)) === teamId);
 }
 
 function getPayloadString(event: BmsEvent, key: string): string | undefined {
@@ -232,50 +187,11 @@ function getEuropeanStory(): StoryOfTheWeek {
   };
 }
 
-function getLeagueFixtureInput(fixtures: Fixture[], standings: Standing[]): LeagueFixtureInput[] {
-  return fixtures.flatMap((fixture) => {
-    const result = parseFixtureResult(fixture.result);
-    const homeTeam = standings.find((team) => team.club === fixture.home);
-    const awayTeam = standings.find((team) => team.club === fixture.away);
-
-    if (!result || !homeTeam || !awayTeam) {
-      return [];
-    }
-
-    return [{
-      homeTeamId: getTeamId(fixture.home),
-      awayTeamId: getTeamId(fixture.away),
-      homeRankBefore: homeTeam.rank,
-      awayRankBefore: awayTeam.rank,
-      homeScore: result.home,
-      awayScore: result.away,
-    }];
-  });
-}
-
-function getLeagueHeroEvent(variant: "first" | "second", standings: Standing[], fixtures: Fixture[]): BmsEvent | null {
-  const previousLeaderTeamId = variant === "first" ? getTeamId("Borussia") : getTeamId("Karlsruhe");
-  const events = generateLeagueEvents({
-    competitionId: variant === "first" ? "erste-liga" : "zweite-liga",
-    matchday: 14,
-    totalMatchdays: 34,
-    pointsPerWin: 3,
-    previousLeaderTeamId,
-    standings: standings.map((team) => ({
-      teamId: getTeamId(team.club),
-      managerId: getManagerId(team.manager),
-      rank: team.rank,
-      points: team.points,
-    })),
-    fixtures: getLeagueFixtureInput(fixtures, standings),
-    relegationRanks: variant === "first" ? [9, 10] : [7, 8],
-  });
-
-  return getHeroEvent(events);
-}
-
 function getFixtureForTeam(fixtures: Fixture[], teamId: string): Fixture | undefined {
-  return fixtures.find((fixture) => getTeamId(fixture.home) === teamId || getTeamId(fixture.away) === teamId);
+  return fixtures.find((fixture) => (
+    (fixture.homeTeamId ?? getTeamId(fixture.home)) === teamId
+    || (fixture.awayTeamId ?? getTeamId(fixture.away)) === teamId
+  ));
 }
 
 function getHeroWhy(event: BmsEvent | null, standings: Standing[], fixtures: Fixture[]): string {
@@ -444,48 +360,6 @@ function getHighlightedTeamIds(event: BmsEvent | null): string[] {
   return event?.relatedTeamIds ?? [];
 }
 
-function getMatchdayEventBadges(variant: "first" | "second"): MatchdayEventBadge[] {
-  if (variant === "second") {
-    return [
-      { fixtureKey: "Dresden|Nürnberg", label: "Tabellenführung" },
-    ];
-  }
-
-  return [
-    { fixtureKey: "FC Adler|BMS United", label: "Tabellenführung" },
-    { fixtureKey: "Hamburg|Bochum", label: "Überraschung" },
-  ];
-}
-
-function getDynamicTensionZones(standings: Standing[]): TensionZone[] {
-  const leader = standings.find((team) => team.rank === 1);
-  const second = standings.find((team) => team.rank === 2);
-  const internationalTeams = standings.filter((team) => team.rank >= 2 && team.rank <= 4);
-  const relegationTeams = standings.filter((team) => team.zone === "relegation" || team.zone === "bottom");
-
-  return [
-    {
-      label: "🏆 Meisterschaft",
-      story: leader && second
-        ? `${leader.club} führt vor ${second.club} mit ${leader.points - second.points} Punkt${leader.points - second.points === 1 ? "" : "en"}.`
-        : "Das Meisterrennen bleibt offen.",
-      context: "Die Spitze liegt eng zusammen.",
-    },
-    {
-      label: "🌍 Europa",
-      story: `${internationalTeams.length} Clubs kämpfen um zwei internationale Plätze.`,
-      context: "Zwischen Platz 2 und 4 ist alles offen.",
-    },
-    {
-      label: "⬇ Abstieg",
-      story: relegationTeams.length >= 2
-        ? `${relegationTeams[0].club} und ${relegationTeams[1].club} trennen zwei Punkte.`
-        : "Der Kampf um den Klassenerhalt bleibt offen.",
-      context: "Jeder Punkt verändert die Abstiegszone.",
-    },
-  ];
-}
-
 function CrestWithTeam({ team }: { team: StoryTeam }) {
   return (
     <div className="story-team-card">
@@ -623,12 +497,12 @@ function CompetitionHero({
         <p>{meta}</p>
       </div>
       <div className="league-badge">
-        <span>Competition</span>
+        <span>Wettbewerb</span>
         <strong>{badge}</strong>
       </div>
       <article className={`story-week-card story-${story.type}${editorialStory ? " story-editorial" : ""}`}>
         <div className="story-week-copy">
-          <span>Story of the Week</span>
+          <span>Geschichte der Woche</span>
           <strong>{story.headline}</strong>
           {editorialStory ? (
             <>
@@ -703,7 +577,7 @@ function LeagueTable({ rows, highlightedTeamIds = [], showQualificationLine = fa
         <thead>
           <tr>
             <th>Platz</th>
-            <th>Club Crest</th>
+            <th>Wappen</th>
             <th>Verein</th>
             <th>Manager</th>
             <th>Spiele</th>
@@ -715,7 +589,7 @@ function LeagueTable({ rows, highlightedTeamIds = [], showQualificationLine = fa
         <tbody>
           {rows.map((team) => (
             <Fragment key={team.club}>
-              <tr className={`league-zone-${team.zone}${highlightedTeams.has(getTeamId(team.club)) ? " league-story-highlight" : ""}`}>
+              <tr className={`league-zone-${team.zone}${highlightedTeams.has(team.teamId ?? getTeamId(team.club)) ? " league-story-highlight" : ""}`}>
                 <td>{team.rank}</td>
                 <td><span className="league-crest-placeholder small" aria-hidden="true" /></td>
                 <td><strong>{team.club}</strong></td>
@@ -758,10 +632,14 @@ function TensionZones({ zones }: { zones: readonly TensionZone[] }) {
   );
 }
 
-function LeaderboardCards() {
+function LeaderboardCards({
+  items,
+}: {
+  items: readonly { label: string; value: string; detail: string }[];
+}) {
   return (
     <div className="league-leaderboard-grid">
-      {leaderboards.map((item) => (
+      {items.map((item) => (
         <article className="league-leaderboard-card" key={item.label}>
           <span>{item.label}</span>
           <strong>{item.value}</strong>
@@ -811,23 +689,42 @@ function PlayoffPreview() {
   );
 }
 
-function LeagueCompetitionView({ title, variant }: { title: string; variant: "first" | "second" }) {
-  const fixtures = variant === "first" ? leagueFixtures : secondLeagueFixtures;
-  const table = variant === "first" ? leagueStandings : secondLeagueStandings;
-  const heroEvent = getLeagueHeroEvent(variant, table, fixtures);
-  const story = getStoryFromHeroEvent(heroEvent, table);
-  const editorialStory = getEditorialStory(heroEvent, table, fixtures);
-  const highlightedTeamIds = getHighlightedTeamIds(heroEvent);
-  const eventBadges = getMatchdayEventBadges(variant);
-  const tensionSlots = getDynamicTensionZones(table);
+function OfficialLeagueCompetitionView({
+  data,
+  title,
+}: {
+  data: OfficialCompetitionOverview;
+  title: string;
+}) {
+  const fixtures: Fixture[] = data.fixtures;
+  const table: Standing[] = data.standings;
+  const story = getStoryFromHeroEvent(data.heroEvent, table);
+  const editorialStory = getEditorialStory(data.heroEvent, table, fixtures);
 
   return (
     <div className="league-center">
-      <CompetitionHero title={title} meta="Saison 2026/27 · Spieltag 14" badge={title} story={story} editorialStory={editorialStory} />
-      <Section index="01" title="Spannungszonen"><TensionZones zones={tensionSlots} /></Section>
-      <Section index="02" title="Der Spieltag"><MatchdayResults fixtures={fixtures} eventBadges={eventBadges} /></Section>
-      <Section index="03" title="Tabellenstand" id="tabellenstand"><LeagueTable rows={table} highlightedTeamIds={highlightedTeamIds} /></Section>
-      <Section index="04" title="Liga-Leaderboards"><LeaderboardCards /></Section>
+      <CompetitionHero
+        badge={title}
+        editorialStory={editorialStory}
+        meta={`Spieltag ${data.matchday}`}
+        story={story}
+        title={title}
+      />
+      <Section index="01" title="Spannungszonen">
+        <TensionZones zones={data.tensionZones} />
+      </Section>
+      <Section index="02" title="Spieltagsergebnisse">
+        <MatchdayResults fixtures={fixtures} eventBadges={data.eventBadges} />
+      </Section>
+      <Section index="03" title="Tabelle" id="tabellenstand">
+        <LeagueTable
+          highlightedTeamIds={getHighlightedTeamIds(data.heroEvent)}
+          rows={table}
+        />
+      </Section>
+      <Section index="04" title="Liga-Leaderboards">
+        <LeaderboardCards items={data.leaderboards} />
+      </Section>
     </div>
   );
 }
@@ -880,11 +777,21 @@ export default async function CompetitionPage({ params }: { params: Promise<{ co
   }
 
   if (competition === "erste-liga") {
-    return <LeagueCompetitionView title={title} variant="first" />;
+    return (
+      <OfficialLeagueCompetitionView
+        data={officialCompetitionExcelFixture}
+        title={title}
+      />
+    );
   }
 
   if (competition === "zweite-liga") {
-    return <LeagueCompetitionView title={title} variant="second" />;
+    return (
+      <OfficialLeagueCompetitionView
+        data={secondLeagueCompetitionFixture}
+        title={title}
+      />
+    );
   }
 
   if (competition === "pokal") {

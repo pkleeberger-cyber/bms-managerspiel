@@ -6,9 +6,16 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:generate": "prisma generate",
+    "db:validate": "prisma validate",
+    "db:push": "prisma db push",
+    "seed:operational-matchday": "tsx scripts/seed-operational-matchday.ts",
+    "verify:reference-season": "tsx scripts/verify-reference-season.ts",
+    "verify:golden-reference": "tsx scripts/verify-golden-reference.ts"
   },
   "dependencies": {
+    "@prisma/client": "^6.19.3",
     "mongodb": "^7.4.0",
     "next": "16.2.9",
     "react": "19.2.4",
@@ -19,9 +26,13 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dotenv": "^17.4.2",
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
+    "exceljs": "^4.4.0",
+    "prisma": "^6.19.3",
     "tailwindcss": "^4",
+    "tsx": "^4.22.4",
     "typescript": "^5"
   }
 }

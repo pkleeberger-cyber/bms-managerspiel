@@ -3,117 +3,212 @@ import { ComparisonCard } from "@/components/cockpit/comparison-card";
 import { ConsequenceCard } from "@/components/cockpit/consequence-card";
 import { LastMatchCard } from "@/components/cockpit/last-match-card";
 import { TopPlayerCard } from "@/components/cockpit/top-player-card";
-import { TrendChart } from "@/components/cockpit/trend-chart";
+import type { LeagueFormResult, PositionChange } from "@/domain/league-engine";
+import type { AnalysisPlayer } from "@/domain/match-analysis-engine";
+import type { TeamOverviewData } from "@/domain/team-overview";
 
-const positionTrend = [
-  { label: "ST 9", value: 6 },
-  { label: "ST 10", value: 5 },
-  { label: "ST 11", value: 4 },
-  { label: "ST 12", value: 4 },
-  { label: "ST 13", value: 2 },
-  { label: "ST 14", value: 3 },
-];
+const positionLabels = {
+  goalkeeper: "Torwart",
+  defender: "Abwehr",
+  midfielder: "Mittelfeld",
+  forward: "Sturm",
+} as const;
 
-const goalsTrend = [
-  { label: "ST 9", value: 54 },
-  { label: "ST 10", value: 62 },
-  { label: "ST 11", value: 58 },
-  { label: "ST 12", value: 71 },
-  { label: "ST 13", value: 76 },
-  { label: "ST 14", value: 58 },
-];
+const positionChangeLabels: Record<PositionChange, string> = {
+  up: "Platz verbessert",
+  down: "Platz verloren",
+  unchanged: "Platz gehalten",
+  new: "Neu eingeordnet",
+};
 
-export function ManagerCockpit() {
+const formLabels: Record<LeagueFormResult, string> = {
+  W: "S",
+  D: "U",
+  L: "N",
+};
+
+const nextMatchLabels: Record<TeamOverviewData["nextMatch"]["status"], string> = {
+  NOT_SCHEDULED: "Noch nicht angesetzt",
+};
+
+function getDirection(
+  change: PositionChange,
+): "up" | "down" | "neutral" {
+  if (change === "up") {
+    return "up";
+  }
+
+  if (change === "down") {
+    return "down";
+  }
+
+  return "neutral";
+}
+
+function PlayerTakeaway({
+  badge,
+  label,
+  player,
+  tone,
+}: {
+  badge: string;
+  label: string;
+  player: AnalysisPlayer | null;
+  tone: "positive" | "negative";
+}) {
+  return (
+    <div className={`positive-takeaway ${tone}`}>
+      <span className="positive-takeaway-label">{label}</span>
+      {player ? (
+        <TopPlayerCard
+          detailLabel="Offizieller Slot"
+          detailValue={String(player.slotId)}
+          initials={String(player.slotId)}
+          name={player.playerName}
+          points={player.totalPoints}
+          position={positionLabels[player.position]}
+          status={badge}
+          tone={tone}
+        />
+      ) : (
+        <span>Kein gewerteter Spieler</span>
+      )}
+      <span className="positive-takeaway-badge">{badge}</span>
+    </div>
+  );
+}
+
+export function ManagerCockpit({ data }: { data: TeamOverviewData }) {
+  const previousPosition = data.league.previousPosition === null
+    ? "—"
+    : `${data.league.previousPosition}.`;
+  const form = data.league.form.length > 0
+    ? data.league.form.map((result) => formLabels[result]).join(" · ")
+    : "—";
+  const lastFormResult = data.league.form.at(-1);
+  const why = data.analysis.why;
+
   return (
     <div className="cockpit cockpit-terminal cockpit-v2 cockpit-playable">
       <div className="cockpit-topline">
         <div>
           <span>Mein Team / Übersicht</span>
-          <h1>Matchday 14</h1>
+          <h1>Spieltag {data.matchday}</h1>
         </div>
         <div className="matchday-status">
-          <span>ST 14</span>
-          <strong>FINAL</strong>
+          <span>ST {data.matchday}</span>
+          <strong>ABGESCHLOSSEN</strong>
         </div>
       </div>
 
       <CockpitSection index="01" title="Das Match">
-        <LastMatchCard />
+        <LastMatchCard
+          competitionId={data.competitionId}
+          lastMatch={data.lastMatch}
+          matchday={data.matchday}
+        />
       </CockpitSection>
 
-      <CockpitSection index="02" title="Was hat sich verändert?">
+      <CockpitSection index="02" title="Tabellenstand">
         <div className="consequence-grid playable-consequence-grid">
           <ConsequenceCard
-            label="Saisonziel · Europa"
-            current="1 Pkt."
-            reference="Europa"
-            referenceLabel="Ziel"
-            change="Abstand reduziert"
-            insight="Europa in Reichweite"
-            direction="up"
+            change={positionChangeLabels[data.league.positionChange]}
+            current={`${data.league.position}.`}
+            direction={getDirection(data.league.positionChange)}
+            insight="Offizielle Tabellenposition"
+            label="Ligaposition"
+            reference={previousPosition}
+            referenceLabel="Vorher"
           />
           <ConsequenceCard
-            label="Performance · Manager-Tore"
-            current="58"
-            reference="66"
-            referenceLabel="Saison-Ø"
-            change="12 %"
-            insight="Tiefster Wert · 4 ST"
-            direction="down"
+            change="Offizieller Stand"
+            current={String(data.league.leaguePoints)}
+            direction="neutral"
+            insight={`Nach Spieltag ${data.matchday}`}
+            label="Ligapunkte"
+            reference={String(data.matchday)}
+            referenceLabel="Spieltag"
           />
           <ConsequenceCard
-            label="Momentum"
-            current="Beendet"
-            reference="5 Spiele"
-            referenceLabel="Serie"
-            change="1. Niederlage"
-            insight="5 Spiele ungeschlagen"
-            direction="down"
+            change="Letztes Ergebnis"
+            current={form}
+            direction={
+              lastFormResult === "W"
+                ? "up"
+                : lastFormResult === "L"
+                  ? "down"
+                  : "neutral"
+            }
+            insight="Offizielle Form"
+            label="Form"
+            reference={lastFormResult ? formLabels[lastFormResult] : "—"}
+            referenceLabel="Aktuell"
           />
         </div>
       </CockpitSection>
 
       <CockpitSection index="03" title="Wo wurde das Match entschieden?">
         <div className="comparison-grid team-part-grid">
-          <ComparisonCard label="Abwehr" opponentValue={41} managerValue={22} />
-          <ComparisonCard
-            label="Mittelfeld"
-            opponentValue={52}
-            managerValue={34}
-          />
-          <ComparisonCard label="Sturm" opponentValue={36} managerValue={31} />
-          <ComparisonCard label="Torwart" opponentValue={8} managerValue={11} />
+          {data.analysis.positionDuels.map((duel) => (
+            <ComparisonCard
+              difference={duel.difference}
+              key={duel.position}
+              label={positionLabels[duel.position]}
+              managerValue={duel.homePoints}
+              opponentValue={duel.awayPoints}
+              winner={duel.winner}
+            />
+          ))}
         </div>
       </CockpitSection>
 
-      <CockpitSection index="04" title="Positiver Impuls">
-        <div className="positive-takeaway">
-          <span className="positive-takeaway-label">Top Performer</span>
-          <TopPlayerCard
-            name="Jonas Hartmann"
-            position="Mittelfeld"
-            initials="JH"
-            points={15}
-            seasonAverage={10.8}
+      <CockpitSection index="04" title="Spieler des Matches">
+        <div className="overview-player-takeaways">
+          <PlayerTakeaway
+            badge="Bester Spieler"
+            label="Positiver Impuls"
+            player={data.analysis.bestPlayer}
+            tone="positive"
           />
-          <span className="positive-takeaway-badge">Saisonbestwert</span>
+          <PlayerTakeaway
+            badge="Schwächster Spieler"
+            label="Enttäuschung"
+            player={data.analysis.disappointment}
+            tone="negative"
+          />
         </div>
       </CockpitSection>
 
-      <CockpitSection index="05" title="Saisontrend">
-        <div className="season-story-grid season-trend-only">
-          <TrendChart
-            title="Ligaposition"
-            currentValue="3."
-            change="2. → 3."
-            points={positionTrend}
-            lowerIsBetter
+      <CockpitSection index="05" title="Spielentscheidende Faktoren">
+        <div className="consequence-grid playable-consequence-grid">
+          <ConsequenceCard
+            change={why ? `${why.points} Punkte` : "Kein Rückstand"}
+            current={why ? positionLabels[why.position] : "—"}
+            direction={why ? "down" : "neutral"}
+            insight="Größter Rückstand"
+            label="Warum verloren?"
+            reference={why ? String(why.points) : "0"}
+            referenceLabel="Differenz"
           />
-          <TrendChart
-            title="Manager-Tore"
-            currentValue="58"
-            change="Ø 66 · ▼ 12 %"
-            points={goalsTrend}
+          <ConsequenceCard
+            change={`${data.analysis.missingPositionCount} offen`}
+            current={String(data.analysis.replacementPlayerCount)}
+            direction={
+              data.analysis.missingPositionCount > 0 ? "down" : "neutral"
+            }
+            insight={`Größtes Duell: Slot ${data.analysis.biggestDuelSlot ?? "—"}`}
+            label="Aufstellung"
+            reference={String(data.analysis.manualPenaltyCount)}
+            referenceLabel="Manuelle Strafen"
+          />
+          <ConsequenceCard
+            change="Noch offen"
+            current="—"
+            direction="neutral"
+            insight="Keine zukünftige Begegnung im historischen Snapshot"
+            label="Nächstes Match"
+            reference={nextMatchLabels[data.nextMatch.status]}
+            referenceLabel="Status"
           />
         </div>
       </CockpitSection>

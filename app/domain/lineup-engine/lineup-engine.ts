@@ -7,8 +7,10 @@ import {
 import {
   calculatePointBreakdown,
   getEffectiveRating,
+  isValidKickerRating,
   sumPointBreakdown,
 } from "./scoring";
+import { createDefaultCompetitionScoringConfig } from "./scoring-config";
 import { getEffectiveSquad } from "./squad-resolver";
 import type {
   BackupLineupId,
@@ -16,6 +18,7 @@ import type {
   CalculatedMatchLineupResult,
   CalculatedPlayer,
   CalculatedTeam,
+  CompetitionScoringConfig,
   InvalidMatchLineupResult,
   LineupId,
   LineupReplacement,
@@ -55,15 +58,22 @@ function calculatePlayer(
   player: PlayerLineup,
   matchData: PlayerMatchData,
   evaluatedForLineupId: StarterLineupId,
+  scoringConfig: CompetitionScoringConfig,
 ): CalculatedPlayer | null {
-  const effectiveRating = getEffectiveRating(matchData);
+  const effectiveRating = getEffectiveRating(matchData, scoringConfig);
 
   if (!effectiveRating) {
     return null;
   }
 
   const position = getPositionForLineupId(player.lineupId);
-  const points = calculatePointBreakdown(position, effectiveRating.rating, matchData);
+  const points = calculatePointBreakdown(
+    position,
+    effectiveRating.rating,
+    matchData,
+    scoringConfig,
+    effectiveRating.source,
+  );
 
   return {
     lineupId: player.lineupId,
@@ -159,6 +169,7 @@ function calculateResolvedLineup(
   players: readonly PlayerLineup[],
   matchData: readonly PlayerMatchData[],
   appliedPenalties: readonly ManagerMatchdayPenalty[],
+  scoringConfig: CompetitionScoringConfig,
 ): {
   evaluatedPlayers: CalculatedPlayer[];
   team: CalculatedTeam;
@@ -176,7 +187,12 @@ function calculateResolvedLineup(
     const starter = playerByLineupId.get(starterLineupId);
     const starterMatchData = starter ? matchDataByPlayerId.get(starter.playerId) : undefined;
     const calculatedStarter = starter && starterMatchData
-      ? calculatePlayer(starter, starterMatchData, starterLineupId)
+      ? calculatePlayer(
+          starter,
+          starterMatchData,
+          starterLineupId,
+          scoringConfig,
+        )
       : null;
 
     if (calculatedStarter) {
@@ -190,7 +206,12 @@ function calculateResolvedLineup(
         const backup = playerByLineupId.get(backupLineupId);
         const backupMatchData = backup ? matchDataByPlayerId.get(backup.playerId) : undefined;
         const calculatedBackup = backup && backupMatchData
-          ? calculatePlayer(backup, backupMatchData, starterLineupId)
+          ? calculatePlayer(
+              backup,
+              backupMatchData,
+              starterLineupId,
+              scoringConfig,
+            )
           : null;
 
         return calculatedBackup ? [{ backupLineupId, calculatedBackup }] : [];
@@ -240,6 +261,30 @@ export function calculateMatchLineup(
 ): InvalidMatchLineupResult;
 export function calculateMatchLineup(input: CalculateMatchLineupInput): MatchLineupResult;
 export function calculateMatchLineup(input: CalculateMatchLineupInput): MatchLineupResult {
+  const scoringConfig = input.scoringConfig
+    ?? createDefaultCompetitionScoringConfig(input.competitionId);
+
+  if (scoringConfig.competitionId !== input.competitionId) {
+    throw new Error(
+      `Scoring config belongs to ${scoringConfig.competitionId}, expected ${input.competitionId}`,
+    );
+  }
+
+  const phaseOrRoundId = scoringConfig.phaseId ?? scoringConfig.roundId;
+
+  if (!phaseOrRoundId.trim()) {
+    throw new Error("Scoring config requires a non-empty phase or round ID");
+  }
+
+  if (
+    scoringConfig.defaultRatingIfNoRating !== undefined
+    && !isValidKickerRating(scoringConfig.defaultRatingIfNoRating)
+  ) {
+    throw new Error(
+      `Invalid default rating: ${scoringConfig.defaultRatingIfNoRating}`,
+    );
+  }
+
   const effectiveSquad = getEffectiveSquad({
     managerId: input.managerId,
     competitionId: input.competitionId,
@@ -269,7 +314,12 @@ export function calculateMatchLineup(input: CalculateMatchLineupInput): MatchLin
     };
   }
 
-  const result = calculateResolvedLineup(effectiveSquad.players, input.matchData, appliedPenalties);
+  const result = calculateResolvedLineup(
+    effectiveSquad.players,
+    input.matchData,
+    appliedPenalties,
+    scoringConfig,
+  );
 
   return {
     managerId: input.managerId,

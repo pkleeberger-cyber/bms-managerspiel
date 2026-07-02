@@ -7,6 +7,7 @@ import type {
 } from "../league-engine";
 import type {
   CalculatedMatchLineupResult,
+  CompetitionScoringConfig,
   ManagerMatchdayPenalty,
   ManagerSquadAssignment,
   PlayerMatchData,
@@ -61,6 +62,7 @@ export type ProcessMatchdayInput = {
   manualPenalties: readonly ManagerMatchdayPenalty[];
   teamValidity: readonly ManagerTeamValidity[];
   calculationTimestamp: string;
+  scoringConfig?: CompetitionScoringConfig;
 };
 
 export type CalculatedFixtureLineups = {

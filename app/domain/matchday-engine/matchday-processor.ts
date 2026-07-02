@@ -237,6 +237,7 @@ function calculateFixtureLineups(
     assignments: input.squadAssignments,
     matchData: input.kickerMatchData,
     penalties: input.manualPenalties,
+    scoringConfig: input.scoringConfig,
   });
   const awayTeam = calculateMatchLineup({
     managerId: fixture.awayManagerId,
@@ -246,6 +247,7 @@ function calculateFixtureLineups(
     assignments: input.squadAssignments,
     matchData: input.kickerMatchData,
     penalties: input.manualPenalties,
+    scoringConfig: input.scoringConfig,
   });
 
   return {

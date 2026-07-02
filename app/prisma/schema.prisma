@@ -1,0 +1,389 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+enum SeasonStatus {
+  PLANNED
+  ACTIVE
+  COMPLETED
+  ARCHIVED
+}
+
+enum ManagerStatus {
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+enum LeagueLevel {
+  FIRST
+  SECOND
+}
+
+enum TeamStatus {
+  VALID
+  INVALID
+  PAUSED
+}
+
+enum CompetitionType {
+  LEAGUE_1
+  LEAGUE_2
+  CUP
+  EUROPE
+  SUPERCUP
+}
+
+enum CompetitionStatus {
+  PLANNED
+  ACTIVE
+  COMPLETED
+}
+
+enum PositionGroup {
+  TW
+  AB
+  MF
+  ST
+}
+
+enum PlayerStatus {
+  ACTIVE
+  LEFT_BUNDESLIGA
+  INACTIVE
+}
+
+enum SquadAssignmentReason {
+  INITIAL_SQUAD
+  SUMMER_TRANSFER
+  WINTER_TRANSFER
+  REAL_TRANSFER_REPLACEMENT
+  ADMIN_CORRECTION
+}
+
+enum FixtureStatus {
+  SCHEDULED
+  CALCULATED
+  OFFICIAL
+  CANCELLED
+}
+
+enum PlayerMatchDataSource {
+  KICKER
+  ADMIN
+}
+
+enum MatchResultStatus {
+  CALCULATED
+  OFFICIAL
+}
+
+enum AppliedRuleType {
+  TEAM_INVALID
+  TEAM_PENALTY
+  POINT_ADJUSTMENT
+  MATCH_OVERRIDE
+  ADMIN_NOTE
+}
+
+enum TransferPhaseType {
+  SUMMER
+  WINTER
+}
+
+enum TransferPhaseStatus {
+  PLANNED
+  OPEN
+  CLOSED
+  LOCKED
+}
+
+enum TransferSubmissionStatus {
+  DRAFT
+  SUBMITTED
+  ACCEPTED
+  REJECTED
+}
+
+enum MatchdayLifecycleStatus {
+  DRAFT
+  DATA_ENTRY_OPEN
+  DATA_ENTRY_COMPLETE
+  CALCULATED
+  PUBLISHED_PRELIMINARY
+  REOPENED
+  PUBLISHED_OFFICIAL
+  ARCHIVED
+}
+
+model Season {
+  id              String            @id @default(auto()) @map("_id") @db.ObjectId
+  name            String
+  yearStart       Int
+  yearEnd         Int
+  status          SeasonStatus
+  teams           Team[]
+  competitions    Competition[]
+  playerMatchData PlayerMatchData[]
+  transferPhases  TransferPhase[]
+  matchdays       MatchdayLifecycle[]
+
+  @@unique([yearStart, yearEnd])
+  @@index([status])
+}
+
+model Manager {
+  id          String        @id @default(auto()) @map("_id") @db.ObjectId
+  displayName String
+  shortName   String
+  status      ManagerStatus
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  teams       Team[]
+
+  @@unique([shortName])
+  @@index([status])
+}
+
+model Team {
+  id               String               @id @default(auto()) @map("_id") @db.ObjectId
+  seasonId         String               @db.ObjectId
+  managerId        String               @db.ObjectId
+  name             String
+  leagueLevel      LeagueLevel
+  status           TeamStatus
+  season           Season               @relation(fields: [seasonId], references: [id])
+  manager          Manager              @relation(fields: [managerId], references: [id])
+  squadAssignments SquadAssignment[]
+  homeFixtures     Fixture[]            @relation("HomeTeamFixtures")
+  awayFixtures     Fixture[]            @relation("AwayTeamFixtures")
+  appliedRules     AppliedRule[]
+  submissions      TransferSubmission[]
+
+  @@unique([seasonId, managerId])
+  @@index([seasonId, leagueLevel])
+  @@index([status])
+}
+
+model Competition {
+  id             String                @id @default(auto()) @map("_id") @db.ObjectId
+  seasonId       String                @db.ObjectId
+  type           CompetitionType
+  name           String
+  status         CompetitionStatus
+  season         Season                @relation(fields: [seasonId], references: [id])
+  fixtures       Fixture[]
+  tableSnapshots LeagueTableSnapshot[]
+  appliedRules   AppliedRule[]
+  matchdays      MatchdayLifecycle[]
+  versions       MatchdayVersion[]
+
+  @@unique([seasonId, type, name])
+  @@index([seasonId, status])
+}
+
+model Player {
+  id               String            @id @default(auto()) @map("_id") @db.ObjectId
+  kickerId         String?
+  firstName        String?
+  lastName         String
+  displayName      String
+  positionGroup    PositionGroup
+  bundesligaClub   String
+  marketValue      Float
+  status           PlayerStatus
+  squadAssignments SquadAssignment[]
+  matchData        PlayerMatchData[]
+
+  @@unique([kickerId])
+  @@index([positionGroup, status])
+  @@index([bundesligaClub])
+}
+
+model SquadAssignment {
+  id                String                @id @default(auto()) @map("_id") @db.ObjectId
+  teamId            String                @db.ObjectId
+  playerId          String                @db.ObjectId
+  slotId            Int
+  validFromMatchday Int
+  validToMatchday   Int?
+  reason            SquadAssignmentReason
+  createdAt         DateTime              @default(now())
+  team              Team                  @relation(fields: [teamId], references: [id])
+  player            Player                @relation(fields: [playerId], references: [id])
+
+  @@unique([teamId, slotId, playerId, validFromMatchday, validToMatchday])
+  @@index([teamId, slotId, validFromMatchday, validToMatchday])
+  @@index([playerId, validFromMatchday, validToMatchday])
+}
+
+model Fixture {
+  id            String        @id @default(auto()) @map("_id") @db.ObjectId
+  competitionId String        @db.ObjectId
+  matchday      Int
+  round         String?
+  phase         String?
+  homeTeamId    String        @db.ObjectId
+  awayTeamId    String        @db.ObjectId
+  status        FixtureStatus
+  competition   Competition   @relation(fields: [competitionId], references: [id])
+  homeTeam      Team          @relation("HomeTeamFixtures", fields: [homeTeamId], references: [id])
+  awayTeam      Team          @relation("AwayTeamFixtures", fields: [awayTeamId], references: [id])
+  result        MatchResult?
+  appliedRules  AppliedRule[]
+
+  @@unique([competitionId, matchday, homeTeamId, awayTeamId])
+  @@index([competitionId, matchday, status])
+  @@index([homeTeamId, matchday])
+  @@index([awayTeamId, matchday])
+}
+
+model PlayerMatchData {
+  id            String                @id @default(auto()) @map("_id") @db.ObjectId
+  seasonId      String                @db.ObjectId
+  matchday      Int
+  playerId      String                @db.ObjectId
+  rating        Float?
+  goals         Int                   @default(0)
+  yellowRed     Boolean               @default(false)
+  red           Boolean               @default(false)
+  teamOfTheWeek Boolean               @default(false)
+  source        PlayerMatchDataSource
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+  season        Season                @relation(fields: [seasonId], references: [id])
+  player        Player                @relation(fields: [playerId], references: [id])
+
+  @@unique([seasonId, matchday, playerId])
+  @@index([playerId, seasonId, matchday])
+}
+
+model MatchResult {
+  id                  String            @id @default(auto()) @map("_id") @db.ObjectId
+  fixtureId           String            @unique @db.ObjectId
+  calculatedHomeGoals Int
+  calculatedAwayGoals Int
+  officialHomeGoals   Int
+  officialAwayGoals   Int
+  status              MatchResultStatus
+  auditJson           Json?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  fixture             Fixture           @relation(fields: [fixtureId], references: [id])
+
+  @@index([status])
+}
+
+model LeagueTableSnapshot {
+  id            String      @id @default(auto()) @map("_id") @db.ObjectId
+  competitionId String      @db.ObjectId
+  matchday      Int
+  tableJson     Json
+  createdAt     DateTime    @default(now())
+  competition   Competition @relation(fields: [competitionId], references: [id])
+
+  @@unique([competitionId, matchday])
+}
+
+model AppliedRule {
+  id            String          @id @default(auto()) @map("_id") @db.ObjectId
+  fixtureId     String?         @db.ObjectId
+  teamId        String?         @db.ObjectId
+  competitionId String          @db.ObjectId
+  matchday      Int
+  type          AppliedRuleType
+  valueJson     Json
+  reason        String
+  createdAt     DateTime        @default(now())
+  fixture       Fixture?        @relation(fields: [fixtureId], references: [id])
+  team          Team?           @relation(fields: [teamId], references: [id])
+  competition   Competition     @relation(fields: [competitionId], references: [id])
+
+  @@index([competitionId, matchday, type])
+  @@index([fixtureId])
+  @@index([teamId, matchday])
+}
+
+model MatchdayLifecycle {
+  id                    String                  @id @default(auto()) @map("_id") @db.ObjectId
+  seasonId              String                  @db.ObjectId
+  competitionId         String                  @db.ObjectId
+  matchday              Int
+  status                MatchdayLifecycleStatus
+  latestVersionId       String?                 @db.ObjectId
+  lastCalculationAt     DateTime?
+  lastPublishedAt       DateTime?
+  correctionPending     Boolean                 @default(false)
+  correctionReason      String?
+  correctionPlanJson    Json?
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+  season                Season                  @relation(fields: [seasonId], references: [id])
+  competition           Competition             @relation(fields: [competitionId], references: [id])
+  latestVersion         MatchdayVersion?        @relation("LatestMatchdayVersion", fields: [latestVersionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  versions              MatchdayVersion[]       @relation("MatchdayVersions")
+
+  @@unique([competitionId, matchday])
+  @@index([seasonId, competitionId, status])
+  @@index([latestVersionId])
+}
+
+model MatchdayVersion {
+  id                      String                  @id @default(auto()) @map("_id") @db.ObjectId
+  lifecycleId             String                  @db.ObjectId
+  seasonId                String                  @db.ObjectId
+  competitionId           String                  @db.ObjectId
+  matchday                Int
+  versionNumber           Int
+  status                  MatchdayLifecycleStatus
+  createdAt               DateTime                @default(now())
+  createdBy               String?
+  reason                  String?
+  calculationSnapshotJson Json?
+  officialMatchdayJson    Json?
+  publishedAt             DateTime?
+  lifecycle               MatchdayLifecycle       @relation("MatchdayVersions", fields: [lifecycleId], references: [id])
+  visibleForLifecycles    MatchdayLifecycle[]     @relation("LatestMatchdayVersion")
+  competition             Competition             @relation(fields: [competitionId], references: [id])
+
+  @@unique([competitionId, matchday, versionNumber])
+  @@index([lifecycleId, versionNumber])
+  @@index([seasonId, competitionId, matchday, status])
+}
+
+model TransferPhase {
+  id          String               @id @default(auto()) @map("_id") @db.ObjectId
+  seasonId    String               @db.ObjectId
+  type        TransferPhaseType
+  status      TransferPhaseStatus
+  opensAt     DateTime?
+  deadlineAt  DateTime?
+  season      Season               @relation(fields: [seasonId], references: [id])
+  submissions TransferSubmission[]
+
+  @@unique([seasonId, type])
+  @@index([status, opensAt, deadlineAt])
+}
+
+model TransferSubmission {
+  id              String                   @id @default(auto()) @map("_id") @db.ObjectId
+  transferPhaseId String                   @db.ObjectId
+  teamId          String                   @db.ObjectId
+  status          TransferSubmissionStatus
+  submittedAt     DateTime?
+  budgetJson      Json
+  transfersJson   Json
+  validationJson  Json
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+  transferPhase   TransferPhase            @relation(fields: [transferPhaseId], references: [id])
+  team            Team                     @relation(fields: [teamId], references: [id])
+
+  @@unique([transferPhaseId, teamId])
+  @@index([teamId, status])
+}

@@ -37,6 +37,28 @@ export type KickerRating =
   | 5.5
   | 6;
 
+type CompetitionScoringConfigBase = {
+  competitionId: string;
+  useKickerRatings: boolean;
+  defaultRatingIfNoRating?: number;
+  countAppearanceWithoutRating: boolean;
+  goalsCountWithoutRating: boolean;
+  teamOfWeekEnabled: boolean;
+  yellowRedEnabled: boolean;
+  redEnabled: boolean;
+};
+
+export type CompetitionScoringConfig = CompetitionScoringConfigBase & (
+  | {
+      phaseId: string;
+      roundId?: never;
+    }
+  | {
+      phaseId?: never;
+      roundId: string;
+    }
+);
+
 export type SquadAssignmentReason =
   | "INITIAL_SQUAD"
   | "REAL_TRANSFER_REPLACEMENT"
@@ -178,4 +200,5 @@ export type CalculateMatchLineupInput = {
   assignments: readonly ManagerSquadAssignment[];
   matchData: readonly PlayerMatchData[];
   penalties?: readonly ManagerMatchdayPenalty[];
+  scoringConfig?: CompetitionScoringConfig;
 };
