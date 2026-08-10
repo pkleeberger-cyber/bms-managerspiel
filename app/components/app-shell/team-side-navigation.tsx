@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 
 import { teamNavigation } from "@/components/app-shell/navigation-config";
 
@@ -21,8 +21,15 @@ function isActive(pathname: string, href: string): boolean {
   ) ?? false;
 }
 
-export function TeamSideNavigation() {
+export function TeamSideNavigation({
+  defaultManagerSeasonId,
+}: {
+  defaultManagerSeasonId?: string;
+}) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const managerSeasonId =
+    searchParams.get("managerSeasonId") ?? defaultManagerSeasonId;
 
   return (
     <nav className="team-side-navigation" aria-label="Mein Team Navigation">
@@ -31,13 +38,41 @@ export function TeamSideNavigation() {
         {teamNavigation.map((item) => (
           <Link
             className={isActive(pathname, item.href) ? "active" : undefined}
-            href={item.href}
+            href={withManagerContext(item.href, managerSeasonId)}
             key={item.href}
           >
+            <span aria-hidden="true">{getTeamNavigationIcon(item.label)}</span>
             {item.label}
           </Link>
         ))}
       </div>
     </nav>
   );
+}
+
+function withManagerContext(href: string, managerSeasonId?: string | null) {
+  if (!managerSeasonId) {
+    return href;
+  }
+
+  return `${href}?managerSeasonId=${encodeURIComponent(managerSeasonId)}`;
+}
+
+function getTeamNavigationIcon(label: string) {
+  switch (label) {
+    case "Übersicht":
+      return "▦";
+    case "Profil":
+      return "◉";
+    case "Kader":
+      return "👥";
+    case "Transfers":
+      return "↗";
+    case "Spiele":
+      return "🎯";
+    case "Historie":
+      return "◷";
+    default:
+      return "•";
+  }
 }

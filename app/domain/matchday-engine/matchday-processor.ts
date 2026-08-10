@@ -137,14 +137,7 @@ function validateSquads(
     for (const slotId of OFFICIAL_LINEUP_IDS) {
       const assignmentsForSlot = managerAssignments.filter((assignment) => assignment.slotId === slotId);
 
-      if (assignmentsForSlot.length === 0) {
-        issues.push({
-          code: "MISSING_LINEUP",
-          message: `Missing lineup assignment for manager ${managerId}, slot ${slotId}`,
-          managerId,
-          slotId,
-        });
-      } else if (assignmentsForSlot.length > 1) {
+      if (assignmentsForSlot.length > 1) {
         issues.push({
           code: "DUPLICATE_SQUAD_SLOT",
           message: `Duplicate active lineup assignments for manager ${managerId}, slot ${slotId}`,

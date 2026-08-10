@@ -43,12 +43,16 @@ export function getEffectiveSquad(input: ResolveEffectiveSquadInput): EffectiveS
       && isAssignmentValidForMatchday(assignment, input.matchday);
   });
 
-  const players = OFFICIAL_LINEUP_IDS.map((slotId) => {
+  const players = OFFICIAL_LINEUP_IDS.flatMap((slotId) => {
     const assignmentsForSlot = relevantAssignments.filter((assignment) => assignment.slotId === slotId);
 
-    if (assignmentsForSlot.length !== 1) {
+    if (assignmentsForSlot.length === 0) {
+      return [];
+    }
+
+    if (assignmentsForSlot.length > 1) {
       throw new SquadResolutionError(
-        `Expected exactly one assignment for slot ${slotId} on matchday ${input.matchday}, found ${assignmentsForSlot.length}`,
+        `Expected at most one assignment for slot ${slotId} on matchday ${input.matchday}, found ${assignmentsForSlot.length}`,
       );
     }
 
@@ -63,7 +67,7 @@ export function getEffectiveSquad(input: ResolveEffectiveSquadInput): EffectiveS
 
   const uniquePlayerIds = new Set(players.map((player) => player.playerId));
 
-  if (uniquePlayerIds.size !== OFFICIAL_LINEUP_IDS.length) {
+  if (uniquePlayerIds.size !== players.length) {
     throw new SquadResolutionError(`Effective squad contains duplicate players on matchday ${input.matchday}`);
   }
 

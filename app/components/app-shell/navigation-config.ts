@@ -13,6 +13,7 @@ export const mainNavigation: NavigationItem[] = [
 
 export const teamNavigation: NavigationItem[] = [
   { label: "Übersicht", href: "/team/overview" },
+  { label: "Profil", href: "/team/profile" },
   { label: "Kader", href: "/team/kader" },
   { label: "Transfers", href: "/team/transfers" },
   { label: "Spiele", href: "/team/spiele" },

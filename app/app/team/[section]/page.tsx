@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 
 import { CockpitSection } from "@/components/cockpit/cockpit-section";
 import { PlaceholderPage } from "@/components/placeholder-page";
+import { loadCurrentTeamOverview } from "@/application/team-service";
+import type { TeamOverviewSnapshot } from "@/application/team-service";
 
 const sections = {
   squad: {
@@ -37,300 +39,19 @@ const sections = {
   },
 } as const;
 
-const squadStatus = [
-  {
-    label: "Kaderwert",
-    value: "68,4 Mio. €",
-    support: "+4,8 Mio seit Saisonstart",
-    badge: "Liga-Rang #4",
-    tone: "positive",
-  },
-  {
-    label: "Restbudget",
-    value: "7,6 Mio. €",
-    support: "11 % Budgetreserve",
-    badge: "Flexibel",
-    tone: "neutral",
-  },
-  {
-    label: "Spieler",
-    value: "25",
-    support: "19 Stammoptionen",
-    badge: "+3 vs Liga-Ø",
-    tone: "positive",
-  },
-  {
-    label: "Ø Punkte/Spiel",
-    value: "6,8",
-    support: "+8 % über Liga-Durchschnitt",
-    badge: "Top 5",
-    tone: "positive",
-  },
-  {
-    label: "Teamform",
-    value: "↗ 4/5",
-    support: "4 Gewinner im letzten Spiel",
-    badge: "Steigend",
-    tone: "positive",
-  },
-  {
-    label: "Stärkste Unit",
-    value: "Mittelfeld",
-    support: "42 % aller Teampunkte",
-    badge: "Trägt",
-    tone: "positive",
-  },
-  {
-    label: "Schwächste Unit",
-    value: "Abwehr",
-    support: "18 % unter Teamschnitt",
-    badge: "Achtung",
-    tone: "negative",
-  },
-] as const;
-
-const decisionReview = [
-  {
-    label: "💎 Schnäppchen der Saison",
-    player: "Luca Weber",
-    initials: "LW",
-    keyNumber: "94 Punkte",
-    metric: "+38 % über Erwartung",
-    insight: "Bester Einkauf bisher.",
-    badge: "💎 Schnäppchen",
-    tone: "positive",
-  },
-  {
-    label: "📉 Erwartungen bisher nicht erfüllt",
-    player: "David König",
-    initials: "DK",
-    keyNumber: "42 Punkte",
-    metric: "−41 % unter Erwartung",
-    insight: "Winterpause beobachten.",
-    badge: "📉 Formschwach",
-    tone: "negative",
-  },
-  {
-    label: "⭐ Herzstück deiner Mannschaft",
-    player: "Jonas Hartmann",
-    initials: "JH",
-    keyNumber: "154 Punkte",
-    metric: "18 % aller Teampunkte",
-    insight: "Ohne ihn fehlen deinem Team Punkte.",
-    badge: "⭐ Leistungsträger",
-    tone: "positive",
-  },
-] as const;
-
-const positionUnits = [
-  {
-    unit: "Torwart",
-    points: "86",
-    average: "7,2 Ø pro Spieler",
-    trend: "▂▃▄▃▄",
-    insight: "Konstanter Rückhalt.",
-    tone: "positive",
-  },
-  {
-    unit: "Abwehr",
-    points: "112",
-    average: "18 % unter Teamschnitt",
-    trend: "▇▆▅▄▂",
-    insight: "Hier verlierst du aktuell Spiele.",
-    tone: "negative",
-  },
-  {
-    unit: "Mittelfeld",
-    points: "318",
-    average: "42 % aller Teampunkte",
-    trend: "▁▂▄▆▇",
-    insight: "Stärkster Mannschaftsteil.",
-    tone: "positive",
-  },
-  {
-    unit: "Sturm",
-    points: "242",
-    average: "7,6 Ø pro Spieler",
-    trend: "▂▃▃▄▅",
-    insight: "Gute Punkteausbeute.",
-    tone: "neutral",
-  },
-] as const;
-
-const players = [
-  {
-    name: "Jonas Hartmann",
-    position: "MF",
-    club: "SC Freiburg",
-    trend: "▂▃▄▆▇",
-    status: "🔥 Topform",
-    appearances: 14,
-    grade: "2,4",
-    pointsPerGame: "11,0",
-    goals: 5,
-    cards: "1/0",
-    teamOfDay: 3,
-    points: 154,
-    marketValue: "12,8 Mio. €",
-  },
-  {
-    name: "Luca Weber",
-    position: "ST",
-    club: "VfB Stuttgart",
-    trend: "▁▂▄▆▇",
-    status: "💎 Schnäppchen",
-    appearances: 13,
-    grade: "2,8",
-    pointsPerGame: "7,2",
-    goals: 6,
-    cards: "2/0",
-    teamOfDay: 1,
-    points: 94,
-    marketValue: "6,2 Mio. €",
-  },
-  {
-    name: "Mats Keller",
-    position: "TW",
-    club: "1. FC Köln",
-    trend: "▃▃▄▃▄",
-    status: "🧱 Konstant",
-    appearances: 14,
-    grade: "2,9",
-    pointsPerGame: "6,1",
-    goals: 0,
-    cards: "0/0",
-    teamOfDay: 1,
-    points: 86,
-    marketValue: "5,4 Mio. €",
-  },
-  {
-    name: "Emil Brandt",
-    position: "MF",
-    club: "Mainz 05",
-    trend: "▂▃▃▄▅",
-    status: "⭐ Leistungsträger",
-    appearances: 14,
-    grade: "3,0",
-    pointsPerGame: "6,0",
-    goals: 2,
-    cards: "3/0",
-    teamOfDay: 0,
-    points: 84,
-    marketValue: "7,9 Mio. €",
-  },
-  {
-    name: "Noah Stein",
-    position: "AB",
-    club: "Werder Bremen",
-    trend: "▅▄▃▃▂",
-    status: "⚠ Beobachten",
-    appearances: 12,
-    grade: "3,4",
-    pointsPerGame: "4,7",
-    goals: 1,
-    cards: "4/0",
-    teamOfDay: 0,
-    points: 56,
-    marketValue: "8,1 Mio. €",
-  },
-  {
-    name: "David König",
-    position: "AB",
-    club: "Borussia Dortmund",
-    trend: "▇▆▅▄▂",
-    status: "📉 Formschwach",
-    appearances: 13,
-    grade: "3,7",
-    pointsPerGame: "3,2",
-    goals: 0,
-    cards: "5/1",
-    teamOfDay: 0,
-    points: 42,
-    marketValue: "11,5 Mio. €",
-  },
-] as const;
-
-const seasonRecord = [
-  { label: "Siege", value: "8", icon: "✓", tone: "positive" },
-  { label: "Unentschieden", value: "2", icon: "=", tone: "neutral" },
-  { label: "Niederlagen", value: "4", icon: "×", tone: "negative" },
-  { label: "Tore", value: "812:745", icon: "•", tone: "positive" },
-  { label: "Aktuelle Serie", value: "1 Niederlage", icon: "↘", tone: "negative" },
-] as const;
-
-const matchSchedule = [
-  {
-    matchday: "ST 11",
-    opponent: "Mainz Manager",
-    venue: "Heim",
-    result: "12:9",
-    resultTone: "win",
-    status: "Ausgewertet",
-    action: "Analyse",
-    href: "/team/spiele/11/analyse",
-  },
-  {
-    matchday: "ST 12",
-    opponent: "Ruhrpott XI",
-    venue: "Auswärts",
-    result: "9:9",
-    resultTone: "draw",
-    status: "Ausgewertet",
-    action: "Analyse",
-    href: "/team/spiele/12/analyse",
-  },
-  {
-    matchday: "ST 13",
-    opponent: "Köln Manager",
-    venue: "Heim",
-    result: "11:7",
-    resultTone: "win",
-    status: "Ausgewertet",
-    action: "Analyse",
-    href: "/team/spiele/13/analyse",
-  },
-  {
-    matchday: "ST 14",
-    opponent: "FC Adler",
-    venue: "Heim",
-    result: "8:10",
-    resultTone: "loss",
-    status: "Ausgewertet",
-    action: "Analyse",
-    href: "/team/spiele/14/analyse",
-  },
-  {
-    matchday: "ST 15",
-    opponent: "FC Bayern Manager",
-    venue: "Auswärts",
-    result: "–",
-    resultTone: "neutral",
-    status: "Ausstehend",
-    action: "Vorschau",
-    href: null,
-  },
-  {
-    matchday: "ST 16",
-    opponent: "Borussia Manager",
-    venue: "Heim",
-    result: "–",
-    resultTone: "neutral",
-    status: "Offen",
-    action: null,
-    href: null,
-  },
-] as const;
-
 export function generateStaticParams() {
   return Object.keys(sections).map((section) => ({ section }));
 }
 
 export default async function TeamSectionPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ section: string }>;
+  searchParams?: Promise<{ managerSeasonId?: string }>;
 }) {
   const { section } = await params;
+  const query = await searchParams;
   const page = sections[section as keyof typeof sections];
 
   if (!page) {
@@ -338,11 +59,19 @@ export default async function TeamSectionPage({
   }
 
   if (section === "squad" || section === "kader") {
-    return <SquadOverviewPage />;
+    const snapshot = await loadCurrentTeamOverview({
+      managerSeasonId: query?.managerSeasonId,
+    });
+
+    return <SquadOverviewPage snapshot={snapshot} />;
   }
 
   if (section === "matches" || section === "spiele") {
-    return <SpieleOverviewPage />;
+    const snapshot = await loadCurrentTeamOverview({
+      managerSeasonId: query?.managerSeasonId,
+    });
+
+    return <SpieleOverviewPage snapshot={snapshot} />;
   }
 
   return (
@@ -355,18 +84,61 @@ export default async function TeamSectionPage({
   );
 }
 
-function SpieleOverviewPage() {
+function SpieleOverviewPage({
+  snapshot,
+}: {
+  snapshot: TeamOverviewSnapshot;
+}) {
+  const hasLivingFixtures = snapshot.fixtures.all.length > 0;
+  const nextFixture = snapshot.fixtures.next;
+  const scheduleRows = snapshot.fixtures.all.map((fixture) => ({
+        matchday: `ST ${fixture.matchday}`,
+        opponent: fixture.opponent,
+        venue: fixture.venue === "HOME" ? "Heim" : "Auswärts",
+        result: fixture.result?.label ?? "–",
+        resultTone: getResultTone(fixture.result),
+        status: getFixtureStatusLabel(fixture),
+        action: fixture.result ? "Analyse" : null,
+        href: fixture.result
+          ? createAnalysisHref(fixture.matchday, fixture.id, snapshot.manager.managerSeasonId)
+          : null,
+      }));
+  const calculatedFixtures = snapshot.fixtures.all.filter((fixture) => fixture.result);
+  const wins = calculatedFixtures.filter(
+    (fixture) =>
+      fixture.result && fixture.result.goalsFor > fixture.result.goalsAgainst,
+  ).length;
+  const draws = calculatedFixtures.filter(
+    (fixture) =>
+      fixture.result && fixture.result.goalsFor === fixture.result.goalsAgainst,
+  ).length;
+  const losses = calculatedFixtures.filter(
+    (fixture) =>
+      fixture.result && fixture.result.goalsFor < fixture.result.goalsAgainst,
+  ).length;
+  const seasonRecord = [
+    { label: "Geplant", value: String(snapshot.fixtures.all.length), icon: "•", tone: "neutral" },
+    { label: "Berechnet", value: String(calculatedFixtures.length), icon: "=", tone: "neutral" },
+    { label: "Siege", value: String(wins), icon: "✓", tone: "positive" },
+    { label: "Unentschieden", value: String(draws), icon: "=", tone: "neutral" },
+    { label: "Niederlagen", value: String(losses), icon: "×", tone: "negative" },
+  ] as const;
+
   return (
     <div className="cockpit cockpit-terminal matches-overview">
         <div className="squad-page-header">
           <div>
             <span>Mein Team / Spiele</span>
             <h1>Spiele</h1>
-            <p>Dein Spielplan, deine Ergebnisse und die nächsten Aufgaben.</p>
+            <p>
+              {hasLivingFixtures
+                ? "Dein echter Liga-1-Spielplan aus Prisma. Ergebnisse werden noch nicht berechnet."
+                : "Kein Living-Spielplan für den ausgewählten Manager verfügbar."}
+            </p>
           </div>
           <div className="squad-season-badge">
-            <span>Saison 2026/27</span>
-            <strong>ST 14</strong>
+            <span>Saison {snapshot.season.name}</span>
+            <strong>{nextFixture ? `ST ${nextFixture.matchday}` : "—"}</strong>
           </div>
         </div>
 
@@ -379,12 +151,22 @@ function SpieleOverviewPage() {
                 </div>
                 <div className="next-match-copy">
                   <span>Nächstes Spiel</span>
-                  <h2>FC Bayern Manager</h2>
-                  <small>Gegner: Platz 6</small>
+                  <h2>{nextFixture?.opponent ?? "Noch nicht verfügbar"}</h2>
+                  <small>
+                    {nextFixture ? getFixtureStatusLabel(nextFixture) : "Keine Berechnung vorhanden"}
+                  </small>
                   <div className="next-match-meta">
-                    <b>ST 15</b>
-                    <b>Auswärts</b>
-                    <span className="match-status ausstehend">Ausstehend</span>
+                    <b>{nextFixture ? `ST ${nextFixture.matchday}` : "—"}</b>
+                    <b>
+                      {nextFixture
+                        ? nextFixture.venue === "HOME"
+                          ? "Heim"
+                          : "Auswärts"
+                        : "—"}
+                    </b>
+                    <span className="match-status ausstehend">
+                      {nextFixture ? getFixtureStatusLabel(nextFixture) : "Noch nicht berechnet"}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -428,7 +210,7 @@ function SpieleOverviewPage() {
                 </tr>
               </thead>
               <tbody>
-                {matchSchedule.map((match) => (
+                {scheduleRows.map((match) => (
                   <tr key={match.matchday}>
                     <td>{match.matchday}</td>
                     <td>
@@ -459,6 +241,11 @@ function SpieleOverviewPage() {
                     </td>
                   </tr>
                 ))}
+                {scheduleRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={6}>Keine Living Fixtures vorhanden.</td>
+                  </tr>
+                ) : null}
               </tbody>
             </table>
           </div>
@@ -466,24 +253,44 @@ function SpieleOverviewPage() {
     </div>
   );
 }
-function SquadOverviewPage() {
+function SquadOverviewPage({ snapshot }: { snapshot: TeamOverviewSnapshot }) {
+  const squadRows = snapshot.squad.map((slot) => ({
+    initials: getInitials(slot.displayName),
+    name: slot.displayName,
+    position: slot.positionGroup,
+    positionLabel: positionLabels[slot.positionGroup],
+    club: slot.bundesligaClub,
+    slotId: slot.slotId,
+    marketValue: formatMarketValue(slot.marketValue),
+    status: formatPlayerStatus(slot.status),
+    stats: slot.stats,
+  }));
+  const totalMarketValue = snapshot.squad.reduce(
+    (sum, slot) => sum + slot.marketValue,
+    0,
+  );
+  const unavailableCards = createUnavailableDecisionCards();
+
   return (
-    <div className="cockpit cockpit-terminal squad-overview">
+    <div className="squad-overview figma-kader-page">
       <div className="squad-page-header">
         <div>
-          <span>Mein Team / Kader</span>
+          <span>Mein Team › Kader</span>
           <h1>Kader</h1>
-          <p>Wie gut waren deine Kaderentscheidungen?</p>
+          <p>
+            Wie gut ist dein aktueller Kader aufgestellt?
+          </p>
         </div>
         <div className="squad-season-badge">
-          <span>Saison 2026/27</span>
-          <strong>ST 14</strong>
+          <span>Saison angezeigt</span>
+          <strong>{snapshot.season.name}</strong>
         </div>
       </div>
 
-      <CockpitSection index="01" title="Kaderstatus">
+      <section className="figma-kader-section">
+        <SectionLabel number="01" label="Kaderstatus" />
         <div className="squad-status-grid">
-          {squadStatus.map((item) => (
+          {createSquadStatus(snapshot, totalMarketValue).map((item) => (
             <article className={`squad-status-card ${item.tone}`} key={item.label}>
               <span>{item.label}</span>
               <strong>{item.value}</strong>
@@ -492,11 +299,12 @@ function SquadOverviewPage() {
             </article>
           ))}
         </div>
-      </CockpitSection>
+      </section>
 
-      <CockpitSection index="02" title="Deine Entscheidungen">
+      <section className="figma-kader-section">
+        <SectionLabel number="02" label="Deine Entscheidungen" />
         <div className="decision-review-grid">
-          {decisionReview.map((item) => (
+          {unavailableCards.map((item) => (
             <article className="decision-card" key={item.label}>
               <header>
                 <span>{item.label}</span>
@@ -506,7 +314,7 @@ function SquadOverviewPage() {
                 <span className={`decision-avatar ${item.tone}`}>
                   {item.initials}
                 </span>
-                <strong>{item.player}</strong>
+                <strong>{item.title}</strong>
                 <span className="decision-insight">{item.insight}</span>
               </div>
               <div className="decision-metrics">
@@ -516,27 +324,36 @@ function SquadOverviewPage() {
             </article>
           ))}
         </div>
-      </CockpitSection>
+      </section>
 
-      <CockpitSection index="03" title="Mannschaftsteile">
+      <section className="figma-kader-section">
+        <SectionLabel number="03" label="Mannschaftsteile" />
         <div className="position-unit-grid">
-          {positionUnits.map((unit) => (
-            <article className="position-unit-card" key={unit.unit}>
+          {snapshot.liveSummary.positions.map((unit) => (
+            <article className="position-unit-card" key={unit.position}>
               <header>
-                <span>{unit.unit}</span>
-                <b className={unit.tone}>{unit.average}</b>
+                <span>{positionLabels[unit.position]}</span>
+                <b className={unit.count === unit.expectedCount ? "positive" : "negative"}>
+                  {unit.count}/{unit.expectedCount} Spieler
+                </b>
               </header>
-              <strong>{unit.points}</strong>
-              <span className="unit-sparkline">{unit.trend}</span>
+              <strong>{formatMarketValue(unit.marketValue)}</strong>
+              <span className="unit-sparkline">{unit.count} aktive Slots</span>
               <div>
-                <b>{unit.insight}</b>
+                <span>{formatMarketValue(unit.marketValue)} Kaderwert</span>
+                <b>
+                  {unit.count === unit.expectedCount
+                    ? "Struktur vollständig"
+                    : "Struktur prüfen"}
+                </b>
               </div>
             </article>
           ))}
         </div>
-      </CockpitSection>
+      </section>
 
-      <CockpitSection index="04" title="Spielerkader">
+      <section className="figma-kader-section">
+        <SectionLabel number="04" label="Spielerkader" />
         <div className="squad-table-card">
           <div className="squad-table-wrap">
             <table className="squad-player-table">
@@ -557,38 +374,286 @@ function SquadOverviewPage() {
                 </tr>
               </thead>
               <tbody>
-                {players.map((player) => (
-                  <tr key={player.name}>
+                {squadRows.map((player) => (
+                  <tr key={`${player.slotId}-${player.name}`}>
                     <td>
                       <div className="squad-player-cell">
-                        <strong>{player.name}</strong>
-                        <span>{player.club}</span>
+                        <span className="squad-player-avatar" aria-hidden="true">
+                          {player.initials}
+                        </span>
+                        <div>
+                          <strong>{player.name}</strong>
+                          <span>Slot {player.slotId} · {player.club}</span>
+                        </div>
                       </div>
                     </td>
-                    <td>{player.position}</td>
                     <td>
-                      <span className="player-sparkline">{player.trend}</span>
+                      <span className="squad-position-badge">
+                        {player.positionLabel}
+                      </span>
                     </td>
                     <td>
-                      <span className="player-status">{player.status}</span>
+                      <span className="player-sparkline">—</span>
                     </td>
-                    <td>{player.appearances}</td>
-                    <td>{player.grade}</td>
-                    <td>{player.pointsPerGame}</td>
-                    <td>{player.goals}</td>
-                    <td>{player.cards}</td>
-                    <td>{player.teamOfDay}</td>
                     <td>
-                      <strong>{player.points}</strong>
+                      <span className={`player-status ${player.status.tone}`}>
+                        {player.status.label}
+                      </span>
+                    </td>
+                    <td>{formatOptionalNumber(player.stats?.appearances)}</td>
+                    <td>{formatOptionalRating(player.stats?.averageRating)}</td>
+                    <td>—</td>
+                    <td>{formatOptionalNumber(player.stats?.goals)}</td>
+                    <td>{formatCardSummary(player.stats)}</td>
+                    <td>
+                      {player.stats?.teamOfTheWeek ? (
+                        <span className="team-of-week-badge">
+                          ★ {player.stats.teamOfTheWeek}×
+                        </span>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td>
+                      <strong>{formatOptionalNumber(player.stats?.totalPoints)}</strong>
                     </td>
                     <td>{player.marketValue}</td>
                   </tr>
                 ))}
+                {squadRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={12}>Keine realen Kaderdaten verfügbar.</td>
+                  </tr>
+                ) : null}
               </tbody>
             </table>
           </div>
         </div>
-      </CockpitSection>
+      </section>
     </div>
   );
+}
+
+function SectionLabel({ number, label }: { number: string; label: string }) {
+  return (
+    <div className="figma-section-label">
+      <span>{number}</span>
+      <strong>{label}</strong>
+    </div>
+  );
+}
+
+const positionLabels: Record<
+  TeamOverviewSnapshot["liveSummary"]["positions"][number]["position"],
+  string
+> = {
+  AB: "Abwehr",
+  MF: "Mittelfeld",
+  ST: "Sturm",
+  TW: "Torwart",
+};
+
+function createUnavailableDecisionCards() {
+  return [
+    {
+      label: "Best Value",
+      title: "Noch nicht berechenbar",
+      initials: "—",
+      keyNumber: "—",
+      metric: "Keine Live-Punktequelle",
+      insight: "Player Master liefert Marktwerte, aber noch keine Saisonpunkte.",
+      badge: "Keine Quelle",
+      tone: "negative",
+    },
+    {
+      label: "Enttäuschung",
+      title: "Noch nicht berechenbar",
+      initials: "—",
+      keyNumber: "—",
+      metric: "Keine Erwartungswerte",
+      insight: "Bewertungen werden erst mit offizieller Performancequelle aktiv.",
+      badge: "Keine Quelle",
+      tone: "negative",
+    },
+    {
+      label: "Wichtigster Spieler",
+      title: "Noch nicht berechenbar",
+      initials: "—",
+      keyNumber: "—",
+      metric: "Keine Teampunkte",
+      insight: "Keine Dummywerte, bis offizielle Punkte im Team-Service vorliegen.",
+      badge: "Keine Quelle",
+      tone: "negative",
+    },
+  ] as const;
+}
+
+function createSquadStatus(
+  snapshot: TeamOverviewSnapshot,
+  totalMarketValue: number,
+) {
+  const completePositions = snapshot.liveSummary.positions.filter(
+    (unit) => unit.count === unit.expectedCount,
+  ).length;
+  const nextFixture = snapshot.fixtures.next;
+
+  return [
+    {
+      label: "Kaderwert",
+      value: formatMarketValue(totalMarketValue),
+      support: "Summe offizieller Marktwerte",
+      badge: snapshot.dataSource === "DATABASE" ? "Living DB" : "Fixture",
+      tone: "positive",
+    },
+    {
+      label: "Restbudget",
+      value: snapshot.manager.budget === null
+        ? "—"
+        : formatMarketValue(snapshot.manager.budget),
+      support: "Aktuelles ManagerSeason-Budget",
+      badge: snapshot.manager.budget === null ? "Keine Quelle" : "Aktiv",
+      tone: snapshot.manager.budget === null ? "negative" : "positive",
+    },
+    {
+      label: "Spieler",
+      value: String(snapshot.squad.length),
+      support: "Aktuelle SquadAssignments",
+      badge: snapshot.squad.length === 18 ? "Vollständig" : "Prüfen",
+      tone: snapshot.squad.length === 18 ? "positive" : "negative",
+    },
+    {
+      label: "Struktur",
+      value: `${completePositions}/4`,
+      support: "Vollständige Mannschaftsteile",
+      badge: completePositions === 4 ? "OK" : "Prüfen",
+      tone: completePositions === 4 ? "positive" : "negative",
+    },
+    {
+      label: "Quelle",
+      value: snapshot.dataSource === "DATABASE" ? "Live" : "Fixture",
+      support: "Datenherkunft dieses Kaders",
+      badge: snapshot.dataSource === "DATABASE" ? "Real" : "Fallback",
+      tone: snapshot.dataSource === "DATABASE" ? "positive" : "negative",
+    },
+    {
+      label: "Nächstes Spiel",
+      value: nextFixture ? `ST ${nextFixture.matchday}` : "—",
+      support: nextFixture ? `vs ${nextFixture.opponent}` : "Keine Fixture",
+      badge: nextFixture ? "Geplant" : "Offen",
+      tone: nextFixture ? "positive" : "negative",
+    },
+  ] as const;
+}
+
+function getInitials(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.at(0)?.toUpperCase() ?? "")
+    .join("");
+}
+
+function formatPlayerStatus(status: TeamOverviewSnapshot["squad"][number]["status"]) {
+  if (status === "ACTIVE") {
+    return { label: "Aktiv", tone: "active" };
+  }
+
+  if (status === "LEFT_BUNDESLIGA") {
+    return { label: "Bundesliga verlassen", tone: "warning" };
+  }
+
+  return { label: "Inaktiv", tone: "inactive" };
+}
+
+function formatOptionalNumber(value: number | null | undefined): string {
+  return value === null || value === undefined ? "—" : String(value);
+}
+
+function formatOptionalRating(value: number | null | undefined): string {
+  if (value === null || value === undefined) {
+    return "—";
+  }
+
+  return value.toLocaleString("de-DE", {
+    maximumFractionDigits: 1,
+    minimumFractionDigits: 1,
+  });
+}
+
+function formatCardSummary(
+  stats: TeamOverviewSnapshot["squad"][number]["stats"] | null | undefined,
+): string {
+  if (!stats) {
+    return "—";
+  }
+
+  if (stats.yellowRedCards === 0 && stats.redCards === 0) {
+    return "0";
+  }
+
+  return `${stats.yellowRedCards}/${stats.redCards}`;
+}
+
+function formatMarketValue(value: number): string {
+  return `${value.toLocaleString("de-DE", {
+    maximumFractionDigits: 1,
+    minimumFractionDigits: 0,
+  })} Mio. €`;
+}
+
+function getResultTone(result: TeamOverviewSnapshot["fixtures"]["all"][number]["result"]) {
+  if (!result) {
+    return "neutral";
+  }
+
+  if (result.goalsFor > result.goalsAgainst) {
+    return "win";
+  }
+
+  if (result.goalsFor < result.goalsAgainst) {
+    return "loss";
+  }
+
+  return "draw";
+}
+
+function getFixtureStatusLabel(
+  fixture: TeamOverviewSnapshot["fixtures"]["all"][number],
+) {
+  if (fixture.result?.invalidTeam === "SELF") {
+    return "Team ungültig";
+  }
+
+  if (fixture.result?.invalidTeam === "OPPONENT") {
+    return "Gegner ungültig";
+  }
+
+  if (fixture.visibilityStatus === "PUBLISHED_OFFICIAL") {
+    return "Offiziell";
+  }
+
+  if (fixture.visibilityStatus === "PUBLISHED_PRELIMINARY") {
+    return "Korrekturen vorbehalten";
+  }
+
+  if (fixture.visibilityStatus === "CALCULATED_UNPUBLISHED") {
+    return "Noch nicht veröffentlicht";
+  }
+
+  return "Noch nicht berechnet";
+}
+
+function createAnalysisHref(
+  matchday: number,
+  fixtureId: string,
+  managerSeasonId: string | null,
+) {
+  const params = new URLSearchParams({ fixtureId });
+
+  if (managerSeasonId) {
+    params.set("managerSeasonId", managerSeasonId);
+  }
+
+  return `/team/spiele/${matchday}/analyse?${params.toString()}`;
 }

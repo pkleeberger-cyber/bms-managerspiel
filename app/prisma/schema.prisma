@@ -20,6 +20,44 @@ enum ManagerStatus {
   ARCHIVED
 }
 
+enum ManagerSeasonStatus {
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+enum ManagerParticipationStatus {
+  ACTIVE
+  PAUSED
+  WITHDRAWN
+}
+
+enum ManagerTransferStatus {
+  NOT_STARTED
+  OPEN
+  SUBMITTED
+  LOCKED
+}
+
+enum ManagerSeasonLifecycleStatus {
+  CREATED
+  REGISTERED
+  ACTIVE
+  COMPLETED
+}
+
+enum UserRole {
+  ADMIN
+  DATA_MAINTAINER
+  MANAGER
+}
+
+enum UserStatus {
+  ACTIVE
+  INVITED
+  DISABLED
+}
+
 enum LeagueLevel {
   FIRST
   SECOND
@@ -58,6 +96,12 @@ enum PlayerStatus {
   INACTIVE
 }
 
+enum PlayerListVersionStatus {
+  PREVIEWED
+  APPLIED
+  SUPERSEDED
+}
+
 enum SquadAssignmentReason {
   INITIAL_SQUAD
   SUMMER_TRANSFER
@@ -91,6 +135,19 @@ enum AppliedRuleType {
   ADMIN_NOTE
 }
 
+enum ManualMatchdayAdjustmentType {
+  INVALID_TEAM
+  TEAM_PENALTY
+  POINT_ADJUSTMENT
+  BONUS
+  OTHER
+}
+
+enum ManualMatchdayAdjustmentStatus {
+  ACTIVE
+  VOIDED
+}
+
 enum TransferPhaseType {
   SUMMER
   WINTER
@@ -110,44 +167,180 @@ enum TransferSubmissionStatus {
   REJECTED
 }
 
+enum PlayerDepartureBatchStatus {
+  DRAFT
+  RELEASED
+  VOIDED
+}
+
+enum PlayerDepartureEventStatus {
+  DRAFT
+  ACTIVE
+  VOIDED
+}
+
+enum ManagerMandatoryTransferStatus {
+  OPEN
+  COMPLETED
+  VOIDED
+}
+
+enum PlayerMasterChangeBatchStatus {
+  DRAFT
+  RELEASED
+  VOIDED
+}
+
+enum PlayerMasterChangeStatus {
+  DRAFT
+  ACTIVE
+  VOIDED
+}
+
+enum PlayerMasterChangeType {
+  STATUS_CHANGE
+  CLUB_CHANGE
+  POSITION_CHANGE
+  MARKET_VALUE_CHANGE
+}
+
 enum MatchdayLifecycleStatus {
   DRAFT
   DATA_ENTRY_OPEN
+  DATA_ENTERED
   DATA_ENTRY_COMPLETE
   CALCULATED
+  PRELIMINARY_PUBLISHED
   PUBLISHED_PRELIMINARY
+  MANUAL_REVIEW_CONFIRMED
+  CORRECTIONS_CONFIRMED
+  OFFICIALLY_CLOSED
   REOPENED
   PUBLISHED_OFFICIAL
   ARCHIVED
 }
 
+enum CompetitionLifecycleStatus {
+  CREATED
+  PARTICIPANTS_CONFIRMED
+  FIXTURE_GENERATED
+  READY
+  ACTIVE
+  COMPLETED
+  DRAW_REQUIRED
+  ROUND_READY
+  PARTICIPANTS_REQUIRED
+  LEAGUE_PHASE_READY
+  KNOCKOUT_READY
+  FIXTURE_READY
+}
+
 model Season {
-  id              String            @id @default(auto()) @map("_id") @db.ObjectId
-  name            String
-  yearStart       Int
-  yearEnd         Int
-  status          SeasonStatus
-  teams           Team[]
-  competitions    Competition[]
-  playerMatchData PlayerMatchData[]
-  transferPhases  TransferPhase[]
-  matchdays       MatchdayLifecycle[]
+  id                        String                     @id @default(auto()) @map("_id") @db.ObjectId
+  name                      String
+  yearStart                 Int
+  yearEnd                   Int
+  status                    SeasonStatus
+  teams                     Team[]
+  managerSeasons            ManagerSeason[]
+  competitions              Competition[]
+  playerMatchData           PlayerMatchData[]
+  playerMatchDataImports    PlayerMatchDataImportAudit[]
+  transferPhases            TransferPhase[]
+  matchdays                 MatchdayLifecycle[]
+  playerListVersions        PlayerListVersion[]
+  manualMatchdayAdjustments ManualMatchdayAdjustment[]
+  playerDepartureBatches    PlayerDepartureBatch[]
+  playerMasterChangeBatches PlayerMasterChangeBatch[]
 
   @@unique([yearStart, yearEnd])
   @@index([status])
 }
 
 model Manager {
-  id          String        @id @default(auto()) @map("_id") @db.ObjectId
-  displayName String
-  shortName   String
-  status      ManagerStatus
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  teams       Team[]
+  id             String          @id @default(auto()) @map("_id") @db.ObjectId
+  displayName    String
+  shortName      String
+  status         ManagerStatus
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  teams          Team[]
+  managerSeasons ManagerSeason[]
+  user           User?
 
   @@unique([shortName])
   @@index([status])
+}
+
+model User {
+  id          String     @id @default(auto()) @map("_id") @db.ObjectId
+  email       String
+  displayName String
+  role        UserRole
+  status      UserStatus
+  managerId   String?    @unique @db.ObjectId
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  manager     Manager?   @relation(fields: [managerId], references: [id])
+
+  @@unique([email])
+  @@index([role, status])
+}
+
+model ManagerSeason {
+  id                        String                       @id @default(auto()) @map("_id") @db.ObjectId
+  managerId                 String                       @db.ObjectId
+  seasonId                  String                       @db.ObjectId
+  league                    LeagueLevel
+  budget                    Float
+  status                    ManagerSeasonStatus
+  participation             ManagerParticipationStatus
+  transferStatus            ManagerTransferStatus
+  currentLifecycle          ManagerSeasonLifecycleStatus
+  createdAt                 DateTime                     @default(now())
+  updatedAt                 DateTime                     @updatedAt
+  manager                   Manager                      @relation(fields: [managerId], references: [id])
+  season                    Season                       @relation(fields: [seasonId], references: [id])
+  squadAssignments          SquadAssignment[]
+  manualMatchdayAdjustments ManualMatchdayAdjustment[]
+  mandatoryTransfers        ManagerMandatoryTransfer[]
+
+  @@unique([seasonId, managerId])
+  @@index([seasonId, league])
+  @@index([status, participation])
+}
+
+model SquadImportAudit {
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  importedAt       DateTime @default(now())
+  seasonId         String   @db.ObjectId
+  workbookName     String
+  workbookPath     String?
+  importedManagers Int
+  importedSlots    Int
+  warningsJson     Json
+  durationMs       Int
+  summaryJson      Json
+
+  @@index([seasonId, importedAt])
+}
+
+model ManagerImportAudit {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  importedAt     DateTime @default(now())
+  seasonId       String   @db.ObjectId
+  workbookName   String
+  workbookPath   String?
+  newManagers    Int
+  existing       Int
+  leagueChanges  Int
+  budgetChanges  Int
+  pausedManagers Int
+  errors         Int
+  durationMs     Int
+  summaryJson    Json
+
+  @@index([seasonId, importedAt])
 }
 
 model Team {
@@ -171,55 +364,209 @@ model Team {
 }
 
 model Competition {
-  id             String                @id @default(auto()) @map("_id") @db.ObjectId
-  seasonId       String                @db.ObjectId
-  type           CompetitionType
-  name           String
-  status         CompetitionStatus
-  season         Season                @relation(fields: [seasonId], references: [id])
-  fixtures       Fixture[]
-  tableSnapshots LeagueTableSnapshot[]
-  appliedRules   AppliedRule[]
-  matchdays      MatchdayLifecycle[]
-  versions       MatchdayVersion[]
+  id                        String                     @id @default(auto()) @map("_id") @db.ObjectId
+  seasonId                  String                     @db.ObjectId
+  type                      CompetitionType
+  name                      String
+  status                    CompetitionStatus
+  season                    Season                     @relation(fields: [seasonId], references: [id])
+  lifecycle                 CompetitionLifecycle?
+  fixtures                  Fixture[]
+  tableSnapshots            LeagueTableSnapshot[]
+  appliedRules              AppliedRule[]
+  matchdays                 MatchdayLifecycle[]
+  versions                  MatchdayVersion[]
+  manualMatchdayAdjustments ManualMatchdayAdjustment[]
+  playerMatchDataImports    PlayerMatchDataImportAudit[]
 
   @@unique([seasonId, type, name])
   @@index([seasonId, status])
 }
 
-model Player {
-  id               String            @id @default(auto()) @map("_id") @db.ObjectId
-  kickerId         String?
-  firstName        String?
-  lastName         String
-  displayName      String
-  positionGroup    PositionGroup
-  bundesligaClub   String
-  marketValue      Float
-  status           PlayerStatus
-  squadAssignments SquadAssignment[]
-  matchData        PlayerMatchData[]
+model CompetitionLifecycle {
+  id                    String                     @id @default(auto()) @map("_id") @db.ObjectId
+  competitionId         String                     @unique @db.ObjectId
+  status                CompetitionLifecycleStatus
+  progressPercent       Int
+  availableActionsJson  Json
+  completedActionsJson  Json
+  nextRecommendedAction String?
+  timelineEntriesJson   Json
+  createdAt             DateTime                   @default(now())
+  updatedAt             DateTime                   @updatedAt
+  competition           Competition                @relation(fields: [competitionId], references: [id])
 
-  @@unique([kickerId])
+  @@index([status])
+}
+
+model Player {
+  id                 String                     @id @default(auto()) @map("_id") @db.ObjectId
+  kickerId           String?
+  firstName          String?
+  lastName           String?
+  displayName        String
+  positionGroup      PositionGroup
+  bundesligaClub     String
+  marketValue        Float
+  status             PlayerStatus
+  squadAssignments   SquadAssignment[]
+  matchData          PlayerMatchData[]
+  departureEvents    PlayerDepartureEvent[]
+  mandatoryTransfers ManagerMandatoryTransfer[]
+  masterChanges      PlayerMasterChange[]
+
+  @@unique([displayName])
+  @@index([kickerId])
   @@index([positionGroup, status])
   @@index([bundesligaClub])
 }
 
+model PlayerImportAudit {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  importedAt   DateTime @default(now())
+  workbookName String
+  workbookPath String?
+  imported     Int
+  updated      Int
+  unchanged    Int
+  departures   Int
+  errors       Int
+  durationMs   Int
+  summaryJson  Json
+
+  @@index([importedAt])
+}
+
+model PlayerListVersion {
+  id                 String                  @id @default(auto()) @map("_id") @db.ObjectId
+  seasonId           String                  @db.ObjectId
+  phase              TransferPhaseType
+  versionNumber      Int
+  status             PlayerListVersionStatus
+  filename           String
+  importedAt         DateTime                @default(now())
+  appliedAt          DateTime?
+  countsJson         Json
+  ignoredColumnsJson Json
+  deltaJson          Json
+  note               String?
+  createdBy          String?
+  season             Season                  @relation(fields: [seasonId], references: [id])
+
+  @@unique([seasonId, phase, versionNumber])
+  @@index([seasonId, phase, status])
+  @@index([importedAt])
+}
+
+model PlayerMasterChangeBatch {
+  id                    String                        @id @default(auto()) @map("_id") @db.ObjectId
+  seasonId              String                        @db.ObjectId
+  status                PlayerMasterChangeBatchStatus
+  createdAt             DateTime                      @default(now())
+  releasedAt            DateTime?
+  effectiveFromMatchday Int?
+  note                  String?
+  season                Season                        @relation(fields: [seasonId], references: [id])
+  changes               PlayerMasterChange[]
+
+  @@index([seasonId, status, createdAt])
+}
+
+model PlayerMasterChange {
+  id                 String                   @id @default(auto()) @map("_id") @db.ObjectId
+  batchId            String                   @db.ObjectId
+  playerId           String                   @db.ObjectId
+  type               PlayerMasterChangeType
+  oldStatus          PlayerStatus?
+  newStatus          PlayerStatus?
+  oldClub            String?
+  newClub            String?
+  oldPositionGroup   PositionGroup?
+  newPositionGroup   PositionGroup?
+  oldMarketValue     Float?
+  newMarketValue     Float?
+  reason             String
+  status             PlayerMasterChangeStatus
+  impactWarningsJson Json?
+  createdAt          DateTime                 @default(now())
+  releasedAt         DateTime?
+  batch              PlayerMasterChangeBatch  @relation(fields: [batchId], references: [id])
+  player             Player                   @relation(fields: [playerId], references: [id])
+
+  @@index([batchId, status])
+  @@index([playerId, status])
+  @@index([type, status])
+}
+
 model SquadAssignment {
   id                String                @id @default(auto()) @map("_id") @db.ObjectId
-  teamId            String                @db.ObjectId
+  teamId            String?               @db.ObjectId
+  managerSeasonId   String?               @db.ObjectId
   playerId          String                @db.ObjectId
   slotId            Int
   validFromMatchday Int
   validToMatchday   Int?
   reason            SquadAssignmentReason
   createdAt         DateTime              @default(now())
-  team              Team                  @relation(fields: [teamId], references: [id])
+  team              Team?                 @relation(fields: [teamId], references: [id])
+  managerSeason     ManagerSeason?        @relation(fields: [managerSeasonId], references: [id])
   player            Player                @relation(fields: [playerId], references: [id])
 
-  @@unique([teamId, slotId, playerId, validFromMatchday, validToMatchday])
+  @@unique([managerSeasonId, slotId, validFromMatchday])
+  @@index([managerSeasonId, slotId, validFromMatchday, validToMatchday])
   @@index([teamId, slotId, validFromMatchday, validToMatchday])
   @@index([playerId, validFromMatchday, validToMatchday])
+}
+
+model PlayerDepartureBatch {
+  id                    String                     @id @default(auto()) @map("_id") @db.ObjectId
+  seasonId              String                     @db.ObjectId
+  phaseLabel            String?
+  status                PlayerDepartureBatchStatus
+  createdAt             DateTime                   @default(now())
+  releasedAt            DateTime?
+  effectiveFromMatchday Int?
+  note                  String?
+  season                Season                     @relation(fields: [seasonId], references: [id])
+  events                PlayerDepartureEvent[]
+
+  @@index([seasonId, status, createdAt])
+}
+
+model PlayerDepartureEvent {
+  id                 String                     @id @default(auto()) @map("_id") @db.ObjectId
+  batchId            String                     @db.ObjectId
+  playerId           String                     @db.ObjectId
+  reason             String
+  status             PlayerDepartureEventStatus
+  createdAt          DateTime                   @default(now())
+  releasedAt         DateTime?
+  batch              PlayerDepartureBatch       @relation(fields: [batchId], references: [id])
+  player             Player                     @relation(fields: [playerId], references: [id])
+  mandatoryTransfers ManagerMandatoryTransfer[]
+
+  @@index([batchId, status])
+  @@index([playerId, status])
+}
+
+model ManagerMandatoryTransfer {
+  id                     String                         @id @default(auto()) @map("_id") @db.ObjectId
+  managerSeasonId        String                         @db.ObjectId
+  playerDepartureEventId String                         @db.ObjectId
+  outgoingPlayerId       String                         @db.ObjectId
+  positionGroup          PositionGroup
+  slotId                 Int
+  effectiveFromMatchday  Int
+  status                 ManagerMandatoryTransferStatus
+  createdAt              DateTime                       @default(now())
+  completedAt            DateTime?
+  managerSeason          ManagerSeason                  @relation(fields: [managerSeasonId], references: [id])
+  playerDepartureEvent   PlayerDepartureEvent           @relation(fields: [playerDepartureEventId], references: [id])
+  outgoingPlayer         Player                         @relation(fields: [outgoingPlayerId], references: [id])
+
+  @@unique([managerSeasonId, playerDepartureEventId, slotId])
+  @@index([managerSeasonId, status, effectiveFromMatchday])
+  @@index([outgoingPlayerId, status])
 }
 
 model Fixture {
@@ -263,6 +610,25 @@ model PlayerMatchData {
   @@index([playerId, seasonId, matchday])
 }
 
+model PlayerMatchDataImportAudit {
+  id             String      @id @default(auto()) @map("_id") @db.ObjectId
+  seasonId       String      @db.ObjectId
+  competitionId  String      @db.ObjectId
+  matchday       Int
+  filename       String
+  importedRows   Int
+  updatedRows    Int
+  unchangedRows  Int
+  conflictRows   Int
+  unknownRows    Int
+  importedAt     DateTime    @default(now())
+  summaryJson    Json
+  season         Season      @relation(fields: [seasonId], references: [id])
+  competition    Competition @relation(fields: [competitionId], references: [id])
+
+  @@index([seasonId, competitionId, matchday, importedAt])
+}
+
 model MatchResult {
   id                  String            @id @default(auto()) @map("_id") @db.ObjectId
   fixtureId           String            @unique @db.ObjectId
@@ -277,6 +643,26 @@ model MatchResult {
   fixture             Fixture           @relation(fields: [fixtureId], references: [id])
 
   @@index([status])
+}
+
+model ManualMatchdayAdjustment {
+  id              String                         @id @default(auto()) @map("_id") @db.ObjectId
+  seasonId        String                         @db.ObjectId
+  competitionId   String                         @db.ObjectId
+  matchday        Int
+  managerSeasonId String                         @db.ObjectId
+  type            ManualMatchdayAdjustmentType
+  points          Int
+  reason          String
+  createdAt       DateTime                       @default(now())
+  createdBy       String?
+  status          ManualMatchdayAdjustmentStatus
+  season          Season                         @relation(fields: [seasonId], references: [id])
+  competition     Competition                    @relation(fields: [competitionId], references: [id])
+  managerSeason   ManagerSeason                  @relation(fields: [managerSeasonId], references: [id])
+
+  @@index([competitionId, matchday, status])
+  @@index([managerSeasonId, matchday])
 }
 
 model LeagueTableSnapshot {
@@ -310,23 +696,23 @@ model AppliedRule {
 }
 
 model MatchdayLifecycle {
-  id                    String                  @id @default(auto()) @map("_id") @db.ObjectId
-  seasonId              String                  @db.ObjectId
-  competitionId         String                  @db.ObjectId
-  matchday              Int
-  status                MatchdayLifecycleStatus
-  latestVersionId       String?                 @db.ObjectId
-  lastCalculationAt     DateTime?
-  lastPublishedAt       DateTime?
-  correctionPending     Boolean                 @default(false)
-  correctionReason      String?
-  correctionPlanJson    Json?
-  createdAt             DateTime                @default(now())
-  updatedAt             DateTime                @updatedAt
-  season                Season                  @relation(fields: [seasonId], references: [id])
-  competition           Competition             @relation(fields: [competitionId], references: [id])
-  latestVersion         MatchdayVersion?        @relation("LatestMatchdayVersion", fields: [latestVersionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  versions              MatchdayVersion[]       @relation("MatchdayVersions")
+  id                 String                  @id @default(auto()) @map("_id") @db.ObjectId
+  seasonId           String                  @db.ObjectId
+  competitionId      String                  @db.ObjectId
+  matchday           Int
+  status             MatchdayLifecycleStatus
+  latestVersionId    String?                 @db.ObjectId
+  lastCalculationAt  DateTime?
+  lastPublishedAt    DateTime?
+  correctionPending  Boolean                 @default(false)
+  correctionReason   String?
+  correctionPlanJson Json?
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+  season             Season                  @relation(fields: [seasonId], references: [id])
+  competition        Competition             @relation(fields: [competitionId], references: [id])
+  latestVersion      MatchdayVersion?        @relation("LatestMatchdayVersion", fields: [latestVersionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  versions           MatchdayVersion[]       @relation("MatchdayVersions")
 
   @@unique([competitionId, matchday])
   @@index([seasonId, competitionId, status])

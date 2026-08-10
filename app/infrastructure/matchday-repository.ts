@@ -440,14 +440,21 @@ function createVersionHistoryTitle(status: MatchdayLifecycleStatus) {
   switch (status) {
     case "CALCULATED":
       return "Berechnung";
+    case "PRELIMINARY_PUBLISHED":
     case "PUBLISHED_PRELIMINARY":
       return "Vorläufig veröffentlicht";
+    case "MANUAL_REVIEW_CONFIRMED":
+      return "Malusprüfung bestätigt";
+    case "CORRECTIONS_CONFIRMED":
+      return "Korrekturen bestätigt";
     case "REOPENED":
       return "Zur Korrektur geöffnet";
+    case "OFFICIALLY_CLOSED":
     case "PUBLISHED_OFFICIAL":
       return "Offiziell veröffentlicht";
     case "ARCHIVED":
       return "Archiviert";
+    case "DATA_ENTERED":
     case "DATA_ENTRY_COMPLETE":
       return "Datenerfassung abgeschlossen";
     case "DATA_ENTRY_OPEN":

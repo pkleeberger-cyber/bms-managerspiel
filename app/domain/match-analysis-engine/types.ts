@@ -14,6 +14,8 @@ export type AnalysisTeam = {
   teamId: string;
   teamName: string;
   managerName: string;
+  teamStatus?: "VALID" | "INVALID";
+  invalidReason?: string;
   officialScore: number;
   leaguePoints: 0 | 1 | 3;
   totalPoints: number;
@@ -94,6 +96,13 @@ export type MissingPosition = {
   position: PlayerPosition;
 };
 
+export type LineupWarning = {
+  side: MatchTeamSide;
+  slotId: LineupId;
+  position: PlayerPosition;
+  message: string;
+};
+
 export type AppliedRule = {
   rule: BmsRule;
   audit: RuleAuditEntry | null;
@@ -111,6 +120,7 @@ export type MatchFactors = {
   lowestScoringLine: ScoringLine;
   replacementPlayerCount: number;
   missingPositions: MissingPosition[];
+  lineupWarnings: LineupWarning[];
   appliedRules: AppliedRule[];
   manualPenalties: ManualPenalty[];
 };

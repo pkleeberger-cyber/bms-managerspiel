@@ -1,1 +1,4 @@
 .DS_Store
+app/reports/player-match-data-import/
+app/reports/**/*.json
+reports/**/*.json

@@ -178,6 +178,5 @@ export const matchdayProcessorFixtureProof = {
     validationFixtureIssues.some((issue) => issue.code === "DUPLICATE_MATCH")
     && validationFixtureIssues.some((issue) => issue.code === "MISSING_TEAM")
     && validationFixtureIssues.some((issue) => issue.code === "MISSING_FIXTURE")
-    && validationFixtureIssues.some((issue) => issue.code === "DUPLICATE_MANAGER")
-    && validationFixtureIssues.some((issue) => issue.code === "MISSING_LINEUP"),
+    && validationFixtureIssues.some((issue) => issue.code === "DUPLICATE_MANAGER"),
 } as const;

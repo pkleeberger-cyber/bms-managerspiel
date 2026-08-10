@@ -1,4 +1,5 @@
 import type { OperationalMatchdayLifecycleSnapshot } from "@/domain/matchday-lifecycle";
+import { loadNextScheduledMatchday } from "./living-fixtures-service";
 import {
   FixtureMatchdayRepository,
   PrismaMatchdayRepository,
@@ -32,6 +33,15 @@ export class MatchdayOperationsService {
       };
     }
 
+    const scheduledMatchday = await loadNextScheduledMatchday();
+
+    if (scheduledMatchday.matchday) {
+      return {
+        dataSource: "DATABASE",
+        lifecycle: createScheduledMatchdayLifecycle(scheduledMatchday.matchday),
+      };
+    }
+
     const fallbackSnapshot = await this.fallbackRepository.loadCurrentMatchday();
 
     if (!fallbackSnapshot) {
@@ -53,4 +63,46 @@ export async function loadCurrentMatchdayLifecycle() {
   const service = new MatchdayOperationsService();
 
   return service.loadCurrentLifecycle();
+}
+
+function createScheduledMatchdayLifecycle(input: {
+  seasonId: string;
+  seasonName: string;
+  competitionId: string;
+  competitionName: string;
+  matchday: number;
+  fixtures: number;
+}): OperationalMatchdayLifecycleSnapshot {
+  const createdAt = new Date(0).toISOString();
+
+  return {
+    seasonName: input.seasonName,
+    competitionName: input.competitionName,
+    matchday: input.matchday,
+    currentStatus: "DRAFT",
+    currentVersion: {
+      id: `scheduled-${input.competitionId}-${input.matchday}`,
+      seasonId: input.seasonId,
+      competitionId: input.competitionId,
+      matchday: input.matchday,
+      versionNumber: 0,
+      status: "DRAFT",
+      createdAt,
+      createdBy: "living-fixtures",
+      reason: `${input.fixtures} geplante Fixtures aus Prisma. Noch keine Berechnung.`,
+    },
+    versions: [],
+    versionHistory: [
+      {
+        versionNumber: 0,
+        title: "Geplanter Spieltag",
+        status: "DRAFT",
+        createdAt,
+        reason: "Aus dem importierten Liga-1-Spielplan abgeleitet.",
+      },
+    ],
+    lastCalculationAt: undefined,
+    lastPublishedAt: undefined,
+    correctionPending: false,
+  };
 }

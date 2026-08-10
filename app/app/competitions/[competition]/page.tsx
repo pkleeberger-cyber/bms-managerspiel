@@ -3,11 +3,13 @@ import { notFound } from "next/navigation";
 import { Fragment } from "react";
 import type { ReactNode } from "react";
 
+import { loadLeagueOneFixtures } from "@/application/living-fixtures-service";
 import {
   officialCompetitionExcelFixture,
   secondLeagueCompetitionFixture,
 } from "@/domain/competition-overview/fixture";
 import type { OfficialCompetitionOverview } from "@/domain/competition-overview";
+import type { LivingCompetitionMatchday, LivingCompetitionOverview } from "@/infrastructure";
 import type { BmsEvent } from "@/types/events";
 
 const competitions = {
@@ -30,6 +32,7 @@ type Fixture = {
   awayTeamId?: string;
   result: string;
   status: string;
+  invalidTeamLabel?: string;
   href?: string;
 };
 
@@ -48,6 +51,12 @@ type Standing = {
   points: number;
   form: FormResult[];
   zone: "leader" | "international" | "relegation" | "bottom" | "neutral" | "qualified" | "chasing";
+};
+
+type LeagueViewData = OfficialCompetitionOverview & {
+  latestPublishedMatchday?: number;
+  selectedMatchdayPublished?: boolean;
+  matchdays?: readonly LivingCompetitionMatchday[];
 };
 
 type StoryTeam = Pick<Standing, "rank" | "club" | "manager" | "points">;
@@ -538,7 +547,7 @@ function MatchdayResults({ fixtures, eventBadges = [] }: { fixtures: Fixture[]; 
             </div>
             <div className="league-fixture-score">
               <strong className="league-fixture-result">{fixture.result}</strong>
-              {eventBadge && fixture.href ? <span className="league-analysis-link">Analyse →</span> : null}
+              {fixture.href ? <span className="league-analysis-link">Analyse →</span> : null}
             </div>
             <div className="league-fixture-team away">
               <span className="league-crest-placeholder" aria-hidden="true" />
@@ -549,6 +558,9 @@ function MatchdayResults({ fixtures, eventBadges = [] }: { fixtures: Fixture[]; 
             </div>
             <span className="league-status">{fixture.status}</span>
             <div className="league-fixture-event">
+              {fixture.invalidTeamLabel ? (
+                <span className="league-event-badge">{fixture.invalidTeamLabel}</span>
+              ) : null}
               {eventBadge ? <span className="league-event-badge">{eventBadge.label}</span> : null}
             </div>
           </>
@@ -693,7 +705,7 @@ function OfficialLeagueCompetitionView({
   data,
   title,
 }: {
-  data: OfficialCompetitionOverview;
+  data: LeagueViewData;
   title: string;
 }) {
   const fixtures: Fixture[] = data.fixtures;
@@ -710,23 +722,94 @@ function OfficialLeagueCompetitionView({
         story={story}
         title={title}
       />
+      {data.matchdays ? (
+        <MatchdayHistorySelector
+          competitionSlug="erste-liga"
+          matchdays={data.matchdays}
+        />
+      ) : null}
       <Section index="01" title="Spannungszonen">
         <TensionZones zones={data.tensionZones} />
       </Section>
-      <Section index="02" title="Spieltagsergebnisse">
+      <Section index="02" title={`Ergebnisse Spieltag ${data.matchday}`}>
         <MatchdayResults fixtures={fixtures} eventBadges={data.eventBadges} />
       </Section>
-      <Section index="03" title="Tabelle" id="tabellenstand">
-        <LeagueTable
-          highlightedTeamIds={getHighlightedTeamIds(data.heroEvent)}
-          rows={table}
-        />
+      <Section index="03" title={`Tabelle nach Spieltag ${data.matchday}`} id="tabellenstand">
+        {data.selectedMatchdayPublished === false ? (
+          <article className="league-table-card league-empty-state">
+            <span>Tabelle</span>
+            <strong>Noch nicht veröffentlicht</strong>
+            <p>
+              Für Spieltag {data.matchday} gibt es noch keinen veröffentlichten
+              Tabellenstand. Die Fixtures bleiben als Spielplan sichtbar.
+            </p>
+          </article>
+        ) : (
+          <LeagueTable
+            highlightedTeamIds={getHighlightedTeamIds(data.heroEvent)}
+            rows={table}
+          />
+        )}
       </Section>
       <Section index="04" title="Liga-Leaderboards">
         <LeaderboardCards items={data.leaderboards} />
       </Section>
     </div>
   );
+}
+
+function MatchdayHistorySelector({
+  competitionSlug,
+  matchdays,
+}: {
+  competitionSlug: string;
+  matchdays: readonly LivingCompetitionMatchday[];
+}) {
+  const selectableMatchdays = matchdays.filter((matchday) => matchday.matchday > 0);
+  const selected = selectableMatchdays.find((matchday) => matchday.isSelected) ??
+    selectableMatchdays.find((matchday) => matchday.isPublished) ??
+    selectableMatchdays[0];
+
+  return (
+    <section className="league-matchday-selector" aria-label="Spieltag auswählen">
+      <div>
+        <span>Historie</span>
+        <strong>{selected ? `Spieltag ${selected.matchday}` : "Spieltag"}</strong>
+        <small>{selected ? getMatchdaySelectorLabel(selected) : "Auswahl"}</small>
+      </div>
+      <form action={`/competitions/${competitionSlug}`} className="league-matchday-form">
+        <label htmlFor="league-matchday-select">Spieltag</label>
+        <select
+          defaultValue={String(selected?.matchday ?? 1)}
+          id="league-matchday-select"
+          name="matchday"
+        >
+          {selectableMatchdays.map((matchday) => (
+            <option key={matchday.matchday} value={matchday.matchday}>
+              Spieltag {matchday.matchday} · {getMatchdaySelectorLabel(matchday)}
+            </option>
+          ))}
+        </select>
+        <button type="submit">Öffnen</button>
+      </form>
+    </section>
+  );
+}
+
+function getMatchdaySelectorLabel(matchday: LivingCompetitionMatchday) {
+  if (matchday.matchday === 0) {
+    return "Start";
+  }
+
+  if (matchday.isPublished) {
+    return matchday.status === "PUBLISHED_OFFICIAL" ? "Offiziell" : "Vorläufig";
+  }
+
+  if (matchday.status === "CALCULATED_UNPUBLISHED") {
+    return "Intern";
+  }
+
+  return "Geplant";
 }
 
 function CupCompetitionView() {
@@ -768,8 +851,15 @@ export function generateStaticParams() {
   return Object.keys(competitions).map((competition) => ({ competition }));
 }
 
-export default async function CompetitionPage({ params }: { params: Promise<{ competition: string }> }) {
+export default async function CompetitionPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ competition: string }>;
+  searchParams?: Promise<{ matchday?: string | string[] }>;
+}) {
   const { competition } = await params;
+  const query = await searchParams;
   const title = competitions[competition as CompetitionKey];
 
   if (!title) {
@@ -777,9 +867,16 @@ export default async function CompetitionPage({ params }: { params: Promise<{ co
   }
 
   if (competition === "erste-liga") {
+    const livingFixtures = await loadLeagueOneFixtures(
+      parseMatchdayParam(query?.matchday),
+    );
+    const livingOverview = livingFixtures.overview
+      ? mapLivingCompetitionOverview(livingFixtures.overview)
+      : null;
+
     return (
       <OfficialLeagueCompetitionView
-        data={officialCompetitionExcelFixture}
+        data={livingOverview ?? officialCompetitionExcelFixture}
         title={title}
       />
     );
@@ -803,4 +900,140 @@ export default async function CompetitionPage({ params }: { params: Promise<{ co
   }
 
   return <SupercupCompetitionView />;
+}
+
+function mapLivingCompetitionOverview(
+  overview: LivingCompetitionOverview,
+): LeagueViewData {
+  const currentFixtures = overview.fixtures.filter(
+    (fixture) => fixture.matchday === overview.currentMatchday,
+  );
+  const standings = overview.table.length > 0
+    ? overview.table.map((row) => ({
+        teamId: row.teamId,
+        rank: row.rank,
+        club: row.managerName,
+        manager: row.managerName,
+        played: row.played,
+        goals: `${row.goalsFor}:${row.goalsAgainst}`,
+        points: row.points,
+        form: [],
+        zone: "neutral" as const,
+      }))
+    : overview.currentMatchday === 0
+      ? createEmptyStandingsFromFixtures(overview)
+      : [];
+
+  return {
+    competitionId: overview.competitionId,
+    matchday: overview.currentMatchday,
+    latestPublishedMatchday: overview.latestPublishedMatchday,
+    selectedMatchdayPublished: overview.selectedMatchdayPublished,
+    matchdays: overview.matchdays,
+    heroEvent: null,
+    fixtures: currentFixtures.map((fixture) => ({
+      home: fixture.home.name,
+      homeManager: fixture.home.managerName,
+      homeTeamId: fixture.home.teamId,
+      away: fixture.away.name,
+      awayManager: fixture.away.managerName,
+      awayTeamId: fixture.away.teamId,
+      result: fixture.result
+        ? `${fixture.result.officialHomeGoals} : ${fixture.result.officialAwayGoals}`
+        : "–",
+      status: getLivingFixtureStatusLabel(fixture),
+      invalidTeamLabel: fixture.result?.invalidTeam.home || fixture.result?.invalidTeam.away
+        ? "Team ungültig"
+        : undefined,
+      href: fixture.result
+        ? `/team/spiele/${fixture.matchday}/analyse?fixtureId=${encodeURIComponent(fixture.id)}`
+        : undefined,
+    })),
+    standings,
+    tensionZones: [
+      {
+        label: "Saisonstart",
+        story: "Noch keine Berechnung",
+        context: "Der Spielplan ist importiert, Ergebnisse folgen nach der ersten Berechnung.",
+      },
+    ],
+    leaderboards: [
+      {
+        label: "Spielplan",
+        value: String(overview.fixtures.length),
+        detail: "Importierte Liga-1-Fixtures",
+      },
+      {
+        label: "Aktueller Spieltag",
+        value: String(overview.currentMatchday),
+        detail: "Nächster geplanter Spieltag",
+      },
+      {
+        label: "Status",
+        value: String(currentFixtures.filter((fixture) => fixture.result).length),
+        detail: "Berechnete Ergebnisse aus Prisma",
+      },
+    ],
+    eventBadges: [],
+  };
+}
+
+function getLivingFixtureStatusLabel(
+  fixture: LivingCompetitionOverview["fixtures"][number],
+) {
+  if (fixture.visibilityStatus === "PUBLISHED_OFFICIAL") {
+    return "Offiziell";
+  }
+
+  if (fixture.visibilityStatus === "PUBLISHED_PRELIMINARY") {
+    return "Korrekturen vorbehalten";
+  }
+
+  if (fixture.visibilityStatus === "CALCULATED_UNPUBLISHED") {
+    return "Noch nicht veröffentlicht";
+  }
+
+  return "Noch nicht berechnet";
+}
+
+function parseMatchdayParam(value: string | string[] | undefined) {
+  const raw = Array.isArray(value) ? value[0] : value;
+  const parsed = Number(raw);
+
+  if (!Number.isInteger(parsed) || parsed < 0 || parsed > 34) {
+    return undefined;
+  }
+
+  return parsed;
+}
+
+function createEmptyStandingsFromFixtures(
+  overview: LivingCompetitionOverview,
+): OfficialCompetitionOverview["standings"] {
+  const teams = new Map<string, { teamId: string; managerName: string }>();
+
+  for (const fixture of overview.fixtures) {
+    teams.set(fixture.home.teamId, {
+      teamId: fixture.home.teamId,
+      managerName: fixture.home.managerName,
+    });
+    teams.set(fixture.away.teamId, {
+      teamId: fixture.away.teamId,
+      managerName: fixture.away.managerName,
+    });
+  }
+
+  return [...teams.values()]
+    .sort((first, second) => first.managerName.localeCompare(second.managerName, "de"))
+    .map((team, index) => ({
+      teamId: team.teamId,
+      rank: index + 1,
+      club: team.managerName,
+      manager: team.managerName,
+      played: 0,
+      goals: "0:0",
+      points: 0,
+      form: [],
+      zone: "neutral" as const,
+    }));
 }

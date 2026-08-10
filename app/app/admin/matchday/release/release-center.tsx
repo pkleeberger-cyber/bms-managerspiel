@@ -3,12 +3,15 @@
 import Link from "next/link";
 import { useState } from "react";
 
+import { MatchdayOfficeTabs } from "@/components/matchday-office/matchday-office-tabs";
+
 type ReleaseType = "PRELIMINARY" | "OFFICIAL";
 
 type ReleaseCenterProps = {
   competitionName: string;
   lifecycleStatus: string;
   matchday: number;
+  openWarningCount: number;
   seasonName: string;
   versionNumber: number;
 };
@@ -59,11 +62,14 @@ export function MatchdayReleaseCenter({
   competitionName,
   lifecycleStatus,
   matchday,
+  openWarningCount,
   seasonName,
   versionNumber,
 }: ReleaseCenterProps) {
   const [releaseType, setReleaseType] = useState<ReleaseType>("PRELIMINARY");
   const [isReleased, setIsReleased] = useState(false);
+  const [officialWarningConfirmed, setOfficialWarningConfirmed] = useState(false);
+  const query = `matchday=${matchday}`;
   const visibleConsequences =
     releaseType === "OFFICIAL"
       ? [...baseConsequences, ...officialConsequences]
@@ -72,6 +78,7 @@ export function MatchdayReleaseCenter({
   if (isReleased) {
     return (
       <main className="matchday-release success">
+        <MatchdayOfficeTabs active="release" matchday={matchday} />
         <section className="matchday-release-success" aria-labelledby="release-success">
           <span aria-hidden="true">✓</span>
           <div>
@@ -84,7 +91,7 @@ export function MatchdayReleaseCenter({
             </strong>
           </div>
           <div className="matchday-release-success-actions">
-            <Link href="/admin/matchday">Zum Leitstand</Link>
+            <Link href={`/admin/matchday?${query}`}>Zum Leitstand</Link>
             <Link href="/team/overview">Manageransicht öffnen</Link>
           </div>
         </section>
@@ -92,12 +99,20 @@ export function MatchdayReleaseCenter({
     );
   }
 
+  const officialCloseBlocked =
+    releaseType === "OFFICIAL" &&
+    openWarningCount > 0 &&
+    !officialWarningConfirmed;
   const heroMeta = [
     { label: "Saison", value: seasonName },
     { label: "Wettbewerb", value: competitionName },
     { label: "Spieltag", value: String(matchday) },
     { label: "Current Version", value: String(versionNumber) },
     { label: "Lifecycle Status", value: lifecycleStatus },
+    {
+      label: "Hinweise",
+      value: openWarningCount > 0 ? "Offene Hinweise vorhanden" : "Keine offenen Hinweise",
+    },
   ] as const;
 
   return (
@@ -105,8 +120,9 @@ export function MatchdayReleaseCenter({
       <header className="matchday-ops-title">
         <span>Administration / Spieltag / Freigabe</span>
         <h1>Spieltag freigeben</h1>
-        <p>Bestätige den aktuellen Berechnungsstand für alle Manager.</p>
       </header>
+
+      <MatchdayOfficeTabs active="release" matchday={matchday} />
 
       <section className="matchday-release-hero" aria-labelledby="release-hero">
         <div>
@@ -185,6 +201,30 @@ export function MatchdayReleaseCenter({
             </div>
           </section>
 
+          {openWarningCount > 0 ? (
+            <section className="matchday-release-consequences" aria-labelledby="release-warnings">
+              <span>Lineup Preflight</span>
+              <h3 id="release-warnings">Offene Hinweise vorhanden</h3>
+              <div>
+                <p>
+                  <span aria-hidden="true">!</span>
+                  {openWarningCount} unvollständige Slot-Wertung
+                  {openWarningCount === 1 ? "" : "en"} bleiben offen.
+                </p>
+              </div>
+              {releaseType === "OFFICIAL" ? (
+                <label>
+                  <input
+                    checked={officialWarningConfirmed}
+                    onChange={(event) => setOfficialWarningConfirmed(event.target.checked)}
+                    type="checkbox"
+                  />
+                  Trotz offener Hinweise offiziell abschließen
+                </label>
+              ) : null}
+            </section>
+          ) : null}
+
           <section className="matchday-release-placeholders">
             <span>Future Integration</span>
             {futurePlaceholders.map((placeholder) => (
@@ -195,8 +235,13 @@ export function MatchdayReleaseCenter({
       </div>
 
       <footer className="matchday-release-actions" aria-label="Release Aktionen">
-        <Link href="/admin/matchday/review">Zurück zur Prüfung</Link>
-        <button className="primary" onClick={() => setIsReleased(true)} type="button">
+        <Link href={`/admin/matchday/review?${query}`}>Zurück zur Prüfung</Link>
+        <button
+          className="primary"
+          disabled={officialCloseBlocked}
+          onClick={() => setIsReleased(true)}
+          type="button"
+        >
           Spieltag freigeben
         </button>
       </footer>

@@ -1,150 +1,150 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
-const calculationMeta = [
-  { label: "Spieltag", value: "18" },
-  { label: "Saison", value: "2026/27" },
-  { label: "Zeitpunkt", value: "Heute 09:23" },
-] as const;
+import {
+  calculateMatchdayZero,
+  loadMatchdayZeroDataEntry,
+} from "@/application/matchday-zero-service";
+import { loadMatchdayLineupPreflight } from "@/application/matchday-lineup-preflight-service";
+import {
+  loadMatchdayWorkflow,
+  parseMatchdayParam,
+  parseWorkflowRoleParam,
+} from "@/application/matchday-workflow-service";
+import { MatchdayOfficeTabs } from "@/components/matchday-office/matchday-office-tabs";
 
-const pipelineSteps = [
-  {
-    title: "Historical Squad",
-    status: "Completed",
-    detail: "Historische Kaderstände geladen",
-    tone: "completed",
-    icon: "✓",
-  },
-  {
-    title: "Lineup Engine",
-    status: "Completed",
-    detail: "Manager-Aufstellungen ausgewertet",
-    tone: "completed",
-    icon: "✓",
-  },
-  {
-    title: "Match Result Engine",
-    status: "Completed",
-    detail: "Begegnungen berechnet",
-    tone: "completed",
-    icon: "✓",
-  },
-  {
-    title: "League Engine",
-    status: "Completed",
-    detail: "Zwischentabelle vorbereitet",
-    tone: "completed",
-    icon: "✓",
-  },
-  {
-    title: "Rules Engine",
-    status: "Completed",
-    detail: "Regelkandidaten erkannt",
-    tone: "completed",
-    icon: "✓",
-  },
-  {
-    title: "Official Matchday",
-    status: "Completed",
-    detail: "Offizieller Spieltag erzeugt",
-    tone: "completed",
-    icon: "✓",
-  },
-  {
-    title: "Match Analysis",
-    status: "Completed",
-    detail: "Analyseobjekte erstellt",
-    tone: "completed",
-    icon: "✓",
-  },
-  {
-    title: "Event Engine",
-    status: "Completed",
-    detail: "Ereignisse erzeugt",
-    tone: "completed",
-    icon: "✓",
-  },
-  {
-    title: "Official League Table",
-    status: "Completed",
-    detail: "Tabelle aktualisiert",
-    tone: "completed",
-    icon: "✓",
-  },
-] as const;
+export const dynamic = "force-dynamic";
 
-const statusLegend = [
-  { label: "Waiting", icon: "○", tone: "waiting" },
-  { label: "Running", icon: "↻", tone: "running" },
-  { label: "Completed", icon: "✓", tone: "completed" },
-  { label: "Later", icon: "…", tone: "later" },
-  { label: "Error", icon: "!", tone: "error" },
-] as const;
+type CalculationPageProps = {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+};
 
-const summaryCards = [
-  { label: "Manager ausgewertet", value: "612", detail: "Aktive Bewertungen" },
-  { label: "Begegnungen berechnet", value: "306", detail: "Offizielle Fixtures" },
-  { label: "Regelkandidaten", value: "43", detail: "Für Admin-Prüfung" },
-  { label: "Events erzeugt", value: "18", detail: "Story- und Ligaevents" },
-  { label: "Tabellen aktualisiert", value: "2", detail: "Liga-Snapshots" },
-] as const;
+async function calculateAction(formData: FormData) {
+  "use server";
 
-const calculationLog = [
-  { time: "09:18", event: "Datenerfassung abgeschlossen" },
-  { time: "09:19", event: "Lineup Engine gestartet" },
-  { time: "09:20", event: "612 Manager ausgewertet" },
-  { time: "09:21", event: "306 Begegnungen berechnet" },
-  { time: "09:22", event: "43 Regelkandidaten erkannt" },
-  { time: "09:23", event: "Berechnung abgeschlossen" },
-] as const;
+  const matchday = readActionMatchday(formData);
+  const role = readActionRole(formData);
+  const baseUrl = `/admin/matchday/calculate?matchday=${matchday}&role=${role}`;
+  let redirectUrl = baseUrl;
 
-export default function MatchdayCalculationCenterPage() {
+  try {
+    const result = await calculateMatchdayZero(matchday);
+
+    if (result.status === "BLOCKED") {
+      redirectUrl = `${baseUrl}&calcError=${encodeURIComponent(result.message)}`;
+    } else {
+      redirectUrl = `${baseUrl}&calcMessage=${encodeURIComponent(result.message)}`;
+    }
+  } catch {
+    redirectUrl = `${baseUrl}&calcError=${encodeURIComponent(
+      "Die Berechnung konnte nicht gestartet werden. Bitte Datenlage und Prisma-Verbindung prüfen.",
+    )}`;
+  }
+
+  redirect(redirectUrl);
+}
+
+export default async function MatchdayCalculationCenterPage({
+  searchParams,
+}: CalculationPageProps) {
+  const params = await searchParams;
+  const selectedMatchday = parseMatchdayParam(params?.matchday) ?? 1;
+  const selectedRole = parseWorkflowRoleParam(params?.role);
+  const calcMessage = readStringParam(params?.calcMessage);
+  const calcError = readStringParam(params?.calcError);
+  const [snapshot, workflow, lineupPreflight] = await Promise.all([
+    loadMatchdayZeroDataEntry(selectedMatchday),
+    loadMatchdayWorkflow(selectedMatchday, selectedRole),
+    loadMatchdayLineupPreflight(selectedMatchday),
+  ]);
+  const canCalculate =
+    workflow.metrics.fixtureCount === 9 &&
+    workflow.metrics.managerSeasonCount === 18 &&
+    workflow.metrics.squadAssignmentCount > 0 &&
+    workflow.metrics.relevantPlayerCount > 0 &&
+    workflow.metrics.playerMatchDataCount >= workflow.metrics.relevantPlayerCount;
+  const openLineupDecisionCount =
+    lineupPreflight.managersWithMissingSlots.length;
+  const pipelineSteps = createPipelineSteps(
+    workflow,
+    canCalculate,
+    lineupPreflight.missingSlotCount,
+    openLineupDecisionCount,
+  );
+  const query = `matchday=${workflow.selectedMatchday}&role=${workflow.currentUserRole}`;
+
   return (
     <main className="matchday-calculation">
       <header className="matchday-ops-title">
         <span>Administration / Spieltag / Berechnung</span>
-        <h1>Spieltag berechnen</h1>
-        <p>Die BMS-Engine verarbeitet den aktuellen Spieltag.</p>
+        <h1>Living Matchday Pipeline</h1>
       </header>
+
+      <MatchdayOfficeTabs
+        active="calculation"
+        matchday={workflow.selectedMatchday}
+        role={workflow.currentUserRole}
+      />
 
       <section className="matchday-calculation-hero" aria-labelledby="calculation-hero">
         <div>
-          <span className="matchday-ops-eyebrow">Offizielle BMS-Berechnung</span>
-          <h2 id="calculation-hero">Die Engine-Pipeline ist abgeschlossen</h2>
+          <span className="matchday-ops-eyebrow">
+            {snapshot.competitionName} · Spieltag {workflow.selectedMatchday}
+          </span>
+          <h2 id="calculation-hero">
+            {canCalculate
+              ? openLineupDecisionCount > 0
+                ? "Berechnung mit Hinweisen möglich"
+                : "Berechnung möglich"
+              : "Berechnung blockiert"}
+          </h2>
           <p>
-            Jeder Schritt zeigt, welcher Teil der validierten Domain-Pipeline
-            den Spieltag verarbeitet hat.
+            Aktueller Workflowstatus: {workflow.selectedStatusLabel}. Die
+            Berechnung verändert keine manuellen Adjustments.
           </p>
         </div>
         <div className="matchday-calculation-meta">
-          {calculationMeta.map((item) => (
-            <article key={item.label}>
-              <span>{item.label}</span>
-              <strong>{item.value}</strong>
-            </article>
-          ))}
+          <article>
+            <span>Fixtures</span>
+            <strong>{workflow.metrics.fixtureCount}/9</strong>
+          </article>
+          <article>
+            <span>PlayerMatchData</span>
+            <strong>
+              {workflow.metrics.playerMatchDataCount}/
+              {workflow.metrics.relevantPlayerCount}
+            </strong>
+          </article>
+          <article>
+            <span>MatchResults</span>
+            <strong>{workflow.metrics.resultCount}/9</strong>
+          </article>
+          <article>
+            <span>Lineup</span>
+            <strong>
+              {openLineupDecisionCount === 0
+                ? "OK"
+                : `${openLineupDecisionCount} Review`}
+            </strong>
+          </article>
         </div>
       </section>
 
-      <section
-        className="matchday-calculation-card"
-        aria-labelledby="calculation-pipeline"
-      >
+      {calcMessage || calcError ? (
+        <section className={`matchday-feedback ${calcError ? "error" : "success"}`}>
+          <strong>{calcError ? "Berechnung nicht gestartet" : "Berechnung abgeschlossen"}</strong>
+          <span>{calcError ?? calcMessage}</span>
+        </section>
+      ) : null}
+
+      <section className="matchday-calculation-card">
         <header className="matchday-section-heading">
           <div>
             <span>Pipeline</span>
-            <h2 id="calculation-pipeline">BMS Calculation Pipeline</h2>
+            <h2>Living Datenlage</h2>
           </div>
-          <b>9 Schritte</b>
+          <b>{canCalculate ? "Bereit" : "Blockiert"}</b>
         </header>
-
-        <div className="matchday-pipeline-status-legend" aria-label="Pipeline-Status">
-          {statusLegend.map((status) => (
-            <span className={status.tone} key={status.label}>
-              <b aria-hidden="true">{status.icon}</b>
-              {status.label}
-            </span>
-          ))}
-        </div>
 
         <div className="matchday-pipeline-grid">
           {pipelineSteps.map((step) => (
@@ -162,55 +162,227 @@ export default function MatchdayCalculationCenterPage() {
         </div>
       </section>
 
-      <section
-        className="matchday-calculation-card"
-        aria-labelledby="calculation-summary"
-      >
-        <header className="matchday-section-heading">
-          <div>
-            <span>Ergebnis</span>
-            <h2 id="calculation-summary">Calculation Summary</h2>
+      {snapshot.openCount > 0 ? (
+        <section className="matchday-calculation-card">
+          <header className="matchday-section-heading">
+            <div>
+              <span>Blocker</span>
+              <h2>Fehlende PlayerMatchData</h2>
+            </div>
+            <b>{snapshot.openCount} offen</b>
+          </header>
+          <div className="matchday-activity-timeline">
+            {snapshot.relevantPlayers
+              .filter((player) => player.status === "OPEN")
+              .slice(0, 25)
+              .map((player) => (
+                <article key={player.playerId}>
+                  <time>{player.position}</time>
+                  <span aria-hidden="true" />
+                  <strong>
+                    {player.displayName} · {player.club}
+                  </strong>
+                </article>
+              ))}
           </div>
-          <b>Erfolgreich</b>
-        </header>
+        </section>
+      ) : null}
 
-        <div className="matchday-calculation-summary">
-          {summaryCards.map((card) => (
-            <article key={card.label}>
-              <span>{card.label}</span>
-              <strong>{card.value}</strong>
-              <small>{card.detail}</small>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="matchday-calculation-card" aria-labelledby="calculation-log">
-        <header className="matchday-section-heading">
-          <div>
-            <span>Protokoll</span>
-            <h2 id="calculation-log">Calculation Log</h2>
+      {openLineupDecisionCount > 0 ? (
+        <section className="matchday-calculation-card">
+          <header className="matchday-section-heading">
+            <div>
+              <span>Review</span>
+              <h2>Offene Hinweise</h2>
+            </div>
+            <b>
+              {openLineupDecisionCount} Hinweis
+              {openLineupDecisionCount === 1 ? "" : "e"}
+            </b>
+          </header>
+          <p className="matchday-review-note">
+            Der Preflight hat unvollständige Teamabgaben erkannt. Die
+            Berechnung darf fortgesetzt werden. Fehlende oder nicht wertbare
+            Slots zählen 0; Team ungültig, Punktabzug oder spätere Korrektur
+            bleiben Spielleiterentscheidungen im Review.
+          </p>
+          <div className="matchday-lineup-diagnostics">
+            {lineupPreflight.managersWithMissingSlots.map((manager) => (
+              <article key={manager.managerSeasonId}>
+                <header>
+                  <div>
+                    <span>Manager</span>
+                    <h3>{manager.managerName}</h3>
+                  </div>
+                  <b>{manager.missingSlots.length} offen</b>
+                </header>
+                <div className="matchday-lineup-slot-list">
+                  {manager.missingSlots.map((slot) => (
+                    <section key={`${manager.managerSeasonId}:${slot.slotId}`}>
+                      <div>
+                        <strong>
+                          INCOMPLETE_TEAM · WARNING · Slot {slot.slotId} fehlt / nicht gewertet.
+                        </strong>
+                        <p>
+                          Spieltag {slot.matchday} · Erwartete Position:{" "}
+                          {positionLabel(slot.expectedPosition)} · Matchday-1-Zuordnung:{" "}
+                          {slot.existsOnMatchday1 ? "vorhanden" : "nicht vorhanden"}
+                        </p>
+                      </div>
+                      {slot.matchday1Assignment ? (
+                        <small>
+                          ST1: {slot.matchday1Assignment.playerName} · gültig{" "}
+                          {slot.matchday1Assignment.validFromMatchday}–
+                          {slot.matchday1Assignment.validToMatchday ?? "offen"} ·{" "}
+                          {slot.matchday1Assignment.playerStatus}
+                        </small>
+                      ) : null}
+                      {slot.relatedAssignments.length > 0 ? (
+                        <ul>
+                          {slot.relatedAssignments.map((assignment) => (
+                            <li key={assignment.assignmentId}>
+                              {assignment.playerName}: {assignment.validFromMatchday}–
+                              {assignment.validToMatchday ?? "offen"} ·{" "}
+                              {assignment.reason} · {assignment.playerStatus}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <small>Keine verwandten Assignment-Zeiträume gefunden.</small>
+                      )}
+                    </section>
+                  ))}
+                </div>
+              </article>
+            ))}
           </div>
-          <b>Timeline</b>
-        </header>
-
-        <div className="matchday-activity-timeline">
-          {calculationLog.map((entry) => (
-            <article key={`${entry.time}-${entry.event}`}>
-              <time>{entry.time}</time>
-              <span aria-hidden="true" />
-              <strong>{entry.event}</strong>
-            </article>
-          ))}
-        </div>
-      </section>
+        </section>
+      ) : null}
 
       <footer className="matchday-calculation-actions" aria-label="Aktionen">
-        <Link href="/admin/matchday">Zurück zum Leitstand</Link>
-        <Link className="primary" href="/admin/matchday/review">
-          Regelprüfung öffnen
-        </Link>
+        <Link href={`/admin/matchday/data-entry?${query}`}>Datenerfassung öffnen</Link>
+        <form action={calculateAction}>
+          <input name="matchday" type="hidden" value={workflow.selectedMatchday} />
+          <input name="role" type="hidden" value={workflow.currentUserRole} />
+          <button className="primary" disabled={!canCalculate} type="submit">
+            Spieltag berechnen
+          </button>
+        </form>
+        <Link href={`/admin/matchday/review?${query}`}>Zur Malusprüfung</Link>
+        <Link href={`/admin/matchday?${query}`}>Zurück zum Leitstand</Link>
       </footer>
     </main>
   );
+}
+
+function createPipelineSteps(
+  workflow: Awaited<ReturnType<typeof loadMatchdayWorkflow>>,
+  canCalculate: boolean,
+  missingLineupSlots: number,
+  openLineupDecisionCount: number,
+) {
+  return [
+    {
+      title: "Fixtures vorhanden",
+      status: workflow.metrics.fixtureCount === 9 ? "OK" : "Blockiert",
+      detail: `${workflow.metrics.fixtureCount}/9 Liga-1-Fixtures für ST ${workflow.selectedMatchday}.`,
+      tone: workflow.metrics.fixtureCount === 9 ? "completed" : "error",
+      icon: workflow.metrics.fixtureCount === 9 ? "✓" : "!",
+    },
+    {
+      title: "ManagerSeason vorhanden",
+      status: workflow.metrics.managerSeasonCount === 18 ? "OK" : "Blockiert",
+      detail: `${workflow.metrics.managerSeasonCount}/18 aktive Liga-1-Manager.`,
+      tone: workflow.metrics.managerSeasonCount === 18 ? "completed" : "error",
+      icon: workflow.metrics.managerSeasonCount === 18 ? "✓" : "!",
+    },
+    {
+      title: "SquadAssignments vorhanden",
+      status:
+        workflow.metrics.squadAssignmentCount > 0
+          ? "OK"
+          : "Blockiert",
+      detail:
+        missingLineupSlots === 0
+          ? `${workflow.metrics.squadAssignmentCount} Living SquadAssignments, alle 18 Slots je Manager gültig.`
+          : `${openLineupDecisionCount} INCOMPLETE_TEAM-Warnung${
+              openLineupDecisionCount === 1 ? "" : "en"
+            } für ST ${workflow.selectedMatchday}; Berechnung bleibt möglich.`,
+      tone:
+        workflow.metrics.squadAssignmentCount > 0 && missingLineupSlots === 0
+          ? "completed"
+          : workflow.metrics.squadAssignmentCount > 0
+            ? "waiting"
+            : "error",
+      icon:
+        workflow.metrics.squadAssignmentCount > 0 && missingLineupSlots === 0
+          ? "✓"
+          : workflow.metrics.squadAssignmentCount > 0
+            ? "!"
+            : "!",
+    },
+    {
+      title: "PlayerMatchData vorhanden",
+      status: workflow.metrics.playerMatchDataCount >= workflow.metrics.relevantPlayerCount ? "OK" : "Offen",
+      detail: `${workflow.metrics.playerMatchDataCount}/${workflow.metrics.relevantPlayerCount} relevante Spieler gespeichert.`,
+      tone: workflow.metrics.playerMatchDataCount >= workflow.metrics.relevantPlayerCount ? "completed" : "error",
+      icon: workflow.metrics.playerMatchDataCount >= workflow.metrics.relevantPlayerCount ? "✓" : "!",
+    },
+    {
+      title: "Berechnung möglich",
+      status: canCalculate
+        ? "Bereit"
+        : "Blockiert",
+      detail: canCalculate
+        ? openLineupDecisionCount > 0
+          ? "Mindestquellen sind vollständig; offene Lineup-Hinweise blockieren nicht."
+          : "Alle Mindestquellen sind vollständig."
+        : "Mindestens eine blockierende Living-Datenquelle fehlt.",
+      tone: canCalculate ? "waiting" : "locked",
+      icon: canCalculate ? "○" : "!",
+    },
+    {
+      title: "Veröffentlichung / Review",
+      status: workflow.selectedStatusLabel,
+      detail: `${workflow.metrics.resultCount}/9 MatchResults, ${workflow.metrics.activeAdjustments} aktive Adjustments.`,
+      tone: workflow.metrics.resultCount === 9 ? "completed" : "waiting",
+      icon: workflow.metrics.resultCount === 9 ? "✓" : "○",
+    },
+  ] as const;
+}
+
+function positionLabel(position: string) {
+  if (position === "goalkeeper") {
+    return "TW";
+  }
+
+  if (position === "defender") {
+    return "AB";
+  }
+
+  if (position === "midfielder") {
+    return "MF";
+  }
+
+  if (position === "forward") {
+    return "ST";
+  }
+
+  return position;
+}
+
+function readActionMatchday(formData: FormData) {
+  const parsed = Number(formData.get("matchday") ?? 1);
+
+  return Number.isInteger(parsed) && parsed >= 1 && parsed <= 34 ? parsed : 1;
+}
+
+function readActionRole(formData: FormData) {
+  const raw = String(formData.get("role") ?? "GAME_DIRECTOR");
+
+  return raw === "DATA_MAINTAINER" ? "DATA_MAINTAINER" : "GAME_DIRECTOR";
+}
+
+function readStringParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
 }

@@ -1,248 +1,391 @@
 import Link from "next/link";
 
-const budgetRows = [
-  {
-    label: "Budget Vorsaison",
-    amount: "24,0 Mio. €",
-    detail: "Verfügbares Budget zum Ende der vergangenen Saison",
-    tone: "neutral",
-  },
-  {
-    label: "Saisonabzug",
-    amount: "−0,8 Mio. €",
-    detail: "Jährlicher Budgetausgleich",
-    tone: "negative",
-  },
-  {
-    label: "Prämien",
-    amount: "+2,5 Mio. €",
-    detail: "Erfolge aus Liga und Pokal",
-    tone: "positive",
-  },
-  {
-    label: "Strafen",
-    amount: "−0,3 Mio. €",
-    detail: "Offene Abzüge aus der Vorsaison",
-    tone: "negative",
-  },
-] as const;
+import type { MandatoryTransferRecord } from "@/application/player-departure-service";
+import { loadOpenMandatoryTransfers } from "@/application/player-departure-service";
+import type { TeamOverviewSnapshot } from "@/application/team-service";
+import { loadCurrentTeamOverview } from "@/application/team-service";
+import type { TransferPeriodSnapshot } from "@/application/transfer-period-service";
+import { loadTransferPeriodSnapshot } from "@/application/transfer-period-service";
 
-const teamValueRows = [
-  {
-    label: "Kaderwert Vorsaison",
-    value: "68,4 Mio. €",
-    tone: "neutral",
-  },
-  {
-    label: "Aktueller Kaderwert",
-    value: "74,1 Mio. €",
-    tone: "neutral",
-  },
-  {
-    label: "Marktwertentwicklung",
-    value: "+5,7 Mio. €",
-    tone: "positive",
-  },
-] as const;
+type TransferCenterPageProps = {
+  searchParams?: Promise<{
+    mandatorySuccess?: string;
+    managerSeasonId?: string;
+    normalSuccess?: string;
+  }>;
+};
 
-const transferNumbers = [
-  { label: "Freie Transfers", value: "4", emphasis: false },
-  { label: "Zusätzliche Transfers", value: "2", emphasis: false },
-  { label: "Pflichttransfers", value: "2", emphasis: false },
-  { label: "Bereits verwendet", value: "1", emphasis: false },
-  { label: "Noch verfügbar", value: "5", emphasis: true },
-] as const;
+type TransferState = "CLOSED" | "MANDATORY" | "SUMMER" | "WINTER";
 
-const transferChecks = [
-  { label: "Budget gültig", status: "Erfüllt", tone: "positive" },
-  {
-    label: "Positionsstruktur korrekt",
-    status: "Prüfung ausstehend",
-    tone: "warning",
-  },
-  { label: "Keine Doppelspieler", status: "Erfüllt", tone: "positive" },
-  {
-    label: "Alle Pflichttransfers erledigt",
-    status: "2 offen",
-    tone: "negative",
-  },
-] as const;
+export default async function TransferCenterPage({
+  searchParams,
+}: TransferCenterPageProps) {
+  const params = await searchParams;
+  const snapshot = await loadCurrentTeamOverview({
+    managerSeasonId: params?.managerSeasonId,
+  });
+  const [mandatoryTransfers, transferPeriod] = await Promise.all([
+    loadOpenMandatoryTransfers(snapshot.manager.managerSeasonId),
+    loadTransferPeriodSnapshot(),
+  ]);
+  const state = resolveTransferState(mandatoryTransfers, transferPeriod);
+  const workspaceHref = withManagerContext(
+    "/team/transfers/workspace",
+    snapshot.manager.managerSeasonId ?? params?.managerSeasonId,
+    transferPeriod.activePhase,
+  );
+  const successMessage = params?.mandatorySuccess === "1"
+    ? "Pflichttransfer erfolgreich durchgeführt."
+    : params?.normalSuccess === "1"
+      ? "Transferplan verbindlich abgegeben."
+      : null;
 
-const bundesligaDepartures = [
-  {
-    name: "Mats Beispiel",
-    position: "Abwehr",
-    formerClub: "SC Beispielstadt",
-  },
-  {
-    name: "Jonas Muster",
-    position: "Mittelfeld",
-    formerClub: "SV Musterhausen",
-  },
-] as const;
-
-export default function TransferCenterPage() {
   return (
-    <div className="transfer-center">
-      <header className="transfer-center-hero">
-        <div className="transfer-center-hero-copy">
-          <span>Mein Team / Transfers</span>
-          <h1>Sommertransfer 2026/27</h1>
-          <p>
-            Die Bundesliga ist zurück. Bereite deine Mannschaft auf die neue
-            Saison vor.
-          </p>
-        </div>
-        <div className="transfer-phase-status">
-          <span className="transfer-status-dot" aria-hidden="true" />
+    <div className={`transfer-state-page ${state.toLowerCase()}`}>
+      {successMessage ? (
+        <section className="transfer-success-card">
+          <span aria-hidden="true">✓</span>
           <div>
-            <strong>Transferphase geöffnet</strong>
-            <span>Noch 18 Tage</span>
+            <strong>Transfer erfolgreich</strong>
+            <p>
+              {successMessage} Der Transferstatus wurde neu geladen.
+            </p>
           </div>
-        </div>
-      </header>
+        </section>
+      ) : null}
 
-      <main className="transfer-center-content">
-        <div className="transfer-primary-grid">
-          <section className="transfer-card transfer-budget-card">
-            <header className="transfer-card-heading">
-              <div>
-                <span>Finanzieller Rahmen</span>
-                <h2>Budget &amp; Teamwert</h2>
-              </div>
-              <div className="transfer-budget-total">
-                <span>Transferbudget</span>
-                <strong>25,4 Mio. €</strong>
-              </div>
-            </header>
+      {state === "CLOSED" ? (
+        <ClosedTransferState
+          snapshot={snapshot}
+          transferPeriod={transferPeriod}
+        />
+      ) : null}
 
-            <div className="transfer-budget-list">
-              {budgetRows.map((row, index) => (
-                <div className="transfer-budget-row" key={row.label}>
-                  <span className="transfer-budget-step">{index + 1}</span>
-                  <div>
-                    <strong>{row.label}</strong>
-                    <span>{row.detail}</span>
-                  </div>
-                  <b className={row.tone}>{row.amount}</b>
-                </div>
-              ))}
-            </div>
+      {state === "MANDATORY" ? (
+        <MandatoryTransferState
+          mandatoryTransfers={mandatoryTransfers}
+          snapshot={snapshot}
+          workspaceHref={workspaceHref}
+        />
+      ) : null}
 
-            <div className="transfer-team-value">
-              <span className="transfer-subheading">Teamwert</span>
-              {teamValueRows.map((row) => (
-                <div key={row.label}>
-                  <span>{row.label}</span>
-                  <strong className={row.tone}>{row.value}</strong>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <section className="transfer-card transfer-status-card">
-            <header className="transfer-card-heading">
-              <div>
-                <span>Dein Rahmen</span>
-                <h2>Transferstatus</h2>
-              </div>
-              <span className="transfer-card-badge">Phase aktiv</span>
-            </header>
-
-            <div className="transfer-number-grid">
-              {transferNumbers.map((item) => (
-                <article
-                  className={item.emphasis ? "emphasis" : undefined}
-                  key={item.label}
-                >
-                  <span>{item.label}</span>
-                  <strong>{item.value}</strong>
-                </article>
-              ))}
-            </div>
-
-            <div className="transfer-check-list">
-              <span className="transfer-subheading">Validierungsstatus</span>
-              {transferChecks.map((check) => (
-                <div key={check.label}>
-                  <span
-                    className={`transfer-check-indicator ${check.tone}`}
-                    aria-hidden="true"
-                  />
-                  <strong>{check.label}</strong>
-                  <b className={check.tone}>{check.status}</b>
-                </div>
-              ))}
-            </div>
-          </section>
-        </div>
-
-        <div className="transfer-secondary-grid">
-          <section className="transfer-card transfer-departures-card">
-            <header className="transfer-card-heading">
-              <div>
-                <span>Zusätzliche Möglichkeiten</span>
-                <h2>Bundesliga-Abgänge</h2>
-              </div>
-              <span className="transfer-card-badge warning">2 Spieler</span>
-            </header>
-            <span className="transfer-departure-note">
-              Diese Spieler haben die Bundesliga verlassen und können
-              zusätzlich ersetzt werden.
-            </span>
-            <div className="transfer-departure-list">
-              {bundesligaDepartures.map((player) => (
-                <article key={player.name}>
-                  <span className="transfer-position-badge">
-                    {player.position}
-                  </span>
-                  <div>
-                    <strong>{player.name}</strong>
-                    <span>{player.formerClub}</span>
-                  </div>
-                  <b>Zusätzlich ersetzbar</b>
-                </article>
-              ))}
-            </div>
-          </section>
-
-          <section className="transfer-card transfer-draft-card">
-            <header className="transfer-card-heading">
-              <div>
-                <span>Dein Arbeitsstand</span>
-                <h2>Transferentwurf</h2>
-              </div>
-              <span className="transfer-draft-badge">Entwurf gespeichert</span>
-            </header>
-
-            <div className="transfer-draft-current">
-              <span>Aktueller Entwurf</span>
-              <strong>1 Transfer vorbereitet</strong>
-              <b>Noch nicht abgabebereit</b>
-            </div>
-
-            <dl className="transfer-draft-meta">
-              <div>
-                <dt>Letzte Änderung</dt>
-                <dd>Heute, 18:42 Uhr</dd>
-              </div>
-              <div>
-                <dt>Teamstatus</dt>
-                <dd>Noch nicht abgabebereit</dd>
-              </div>
-            </dl>
-
-            <div className="transfer-draft-actions">
-              <Link href="/team/transfers/workspace">
-                Transferarbeitsplatz öffnen
-              </Link>
-              <button disabled type="button">
-                Team verbindlich abgeben
-              </button>
-            </div>
-          </section>
-        </div>
-      </main>
+      {state === "SUMMER" || state === "WINTER" ? (
+        <OpenTransferState
+          snapshot={snapshot}
+          state={state}
+          workspaceHref={workspaceHref}
+        />
+      ) : null}
     </div>
   );
+}
+
+function ClosedTransferState({
+  snapshot,
+  transferPeriod,
+}: {
+  snapshot: TeamOverviewSnapshot;
+  transferPeriod: TransferPeriodSnapshot;
+}) {
+  return (
+    <>
+      <TransferStateHero
+        badge="Geschlossen"
+        eyebrow="Mein Team / Transfers"
+        icon="🔒"
+        metrics={[
+          { label: "Aktuelle Phase", value: currentTransferPeriodLabel(transferPeriod) },
+          { label: "Nächste Phase", value: nextExpectedTransferPeriodLabel(transferPeriod) },
+          { label: "Pflichttransfers", value: "Keine offenen" },
+          { label: "Handlungsbedarf", value: "Nein" },
+        ]}
+        subtitle="Der Transfermarkt ist aktuell geschlossen."
+        title="Transfermarkt geschlossen"
+        tone="closed"
+      />
+
+      <section className="transfer-closed-empty-card">
+        <div className="transfer-closed-identity">
+          <span>Manager</span>
+          <strong>{snapshot.manager.displayName}</strong>
+          <small>{snapshot.season.name}</small>
+        </div>
+        <div className="transfer-closed-task">
+          <span aria-hidden="true">✓</span>
+          <div>
+            <p>Aktuelle Aufgabe</p>
+            <h2>Kein Handlungsbedarf</h2>
+            <small>
+              Du hast keine offenen Pflichttransfers. Sobald der Transfermarkt
+              geöffnet wird, erscheint hier dein Transferarbeitsplatz.
+            </small>
+          </div>
+        </div>
+      </section>
+    </>
+  );
+}
+
+function MandatoryTransferState({
+  mandatoryTransfers,
+  snapshot,
+  workspaceHref,
+}: {
+  mandatoryTransfers: readonly MandatoryTransferRecord[];
+  snapshot: TeamOverviewSnapshot;
+  workspaceHref: string;
+}) {
+  const primaryTransfer = mandatoryTransfers[0];
+
+  return (
+    <>
+      <TransferStateHero
+        badge="Pflicht"
+        eyebrow="Mein Team / Transfers"
+        icon="⚠"
+        metrics={[
+          { label: "Offen", value: String(mandatoryTransfers.length) },
+          {
+            label: "Budget",
+            value: snapshot.manager.budget === null
+              ? "—"
+              : formatMarketValue(snapshot.manager.budget),
+          },
+        ]}
+        subtitle={`${snapshot.manager.displayName} · ${snapshot.season.name}`}
+        title="Pflichttransfer erforderlich"
+        tone="mandatory"
+      />
+
+      <section className="transfer-state-task warning">
+        <span>Aktuelle Aufgabe</span>
+        <h2>Pflichttransfer durchführen</h2>
+        <p>
+          {primaryTransfer.outgoingPlayerName} muss ersetzt werden, weil der
+          Spieler nicht mehr regulär im Kader gewertet werden kann.
+        </p>
+        <Link className="primary" href={workspaceHref}>
+          Pflichttransfer durchführen
+        </Link>
+      </section>
+
+      <section className="transfer-state-workspace mandatory">
+        <header>
+          <span>Pflichttransfer</span>
+          <h2>Zu ersetzende Spieler</h2>
+        </header>
+        <div className="transfer-mandatory-card-grid">
+          {mandatoryTransfers.map((transfer) => (
+            <article className="transfer-mandatory-player-card" key={transfer.id}>
+              <div>
+                <span>Abgang</span>
+                <strong>{transfer.outgoingPlayerName}</strong>
+                <small>Slot {transfer.slotId} · {transfer.positionGroup}</small>
+              </div>
+              <div>
+                <span>Grund</span>
+                <strong>{transfer.reason || "Bundesliga verlassen"}</strong>
+                <small>Ein Ersatz muss positionsgleich gewählt werden.</small>
+              </div>
+              <div className="transfer-mandatory-action">
+                <span>Budget</span>
+                <strong>
+                  {snapshot.manager.budget === null
+                    ? "—"
+                    : formatMarketValue(snapshot.manager.budget)}
+                </strong>
+                <Link href={workspaceHref}>Pflichttransfer durchführen</Link>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+    </>
+  );
+}
+
+function OpenTransferState({
+  snapshot,
+  state,
+  workspaceHref,
+}: {
+  snapshot: TeamOverviewSnapshot;
+  state: "SUMMER" | "WINTER";
+  workspaceHref: string;
+}) {
+  const title = state === "SUMMER"
+    ? "Sommertransfer geöffnet"
+    : "Wintertransfer geöffnet";
+
+  return (
+    <>
+      <TransferStateHero
+        badge="Offen"
+        eyebrow="Mein Team / Transfers"
+        icon={state === "SUMMER" ? "☀" : "❄"}
+        metrics={[
+          { label: "Resttransfers", value: "Im Arbeitsplatz" },
+          {
+            label: "Budget",
+            value: snapshot.manager.budget === null
+              ? "—"
+              : formatMarketValue(snapshot.manager.budget),
+          },
+          { label: "Kaderwert", value: formatMarketValue(snapshot.liveSummary.totalMarketValue) },
+        ]}
+        subtitle={`${snapshot.manager.displayName} · ${snapshot.season.name}`}
+        title={title}
+        tone="open"
+      />
+
+      <section className="transfer-state-task open">
+        <span>Aktuelle Aufgabe</span>
+        <h2>Transferphase geöffnet</h2>
+        <p>
+          Normale Transfers können geplant, validiert und verbindlich abgegeben
+          werden.
+        </p>
+        <Link className="primary" href={workspaceHref}>
+          Transfer planen
+        </Link>
+      </section>
+
+      <section className="transfer-state-workspace normal">
+        <header>
+          <span>Workspace</span>
+          <h2>Normaler Transfer</h2>
+        </header>
+        <div className="transfer-normal-grid">
+          <article>
+            <span>Transferworkspace</span>
+            <strong>Spieler verkaufen und Ersatz wählen</strong>
+          </article>
+          <article>
+            <span>Transferplan</span>
+            <strong>Abgänge, Zugänge und Budget prüfen</strong>
+          </article>
+          <article>
+            <span>Validierung</span>
+            <strong>Aktive Blocker im Arbeitsplatz</strong>
+          </article>
+        </div>
+      </section>
+    </>
+  );
+}
+
+function TransferStateHero({
+  badge,
+  eyebrow,
+  icon,
+  metrics,
+  subtitle,
+  title,
+  tone = "open",
+}: {
+  badge: string;
+  eyebrow: string;
+  icon?: string;
+  metrics: readonly { label: string; value: string }[];
+  subtitle: string;
+  title: string;
+  tone?: "closed" | "mandatory" | "open";
+}) {
+  return (
+    <header className={`transfer-state-hero ${tone}`}>
+      <div className="transfer-state-hero-copy">
+        {icon ? (
+          <span className="transfer-state-hero-icon" aria-hidden="true">
+            {icon}
+          </span>
+        ) : null}
+        <div>
+          <span>{eyebrow}</span>
+          <h1>{title}</h1>
+          <p>{subtitle}</p>
+        </div>
+      </div>
+      <div className="transfer-state-meta">
+        <b>{badge}</b>
+        {metrics.map((metric) => (
+          <article key={metric.label}>
+            <span>{metric.label}</span>
+            <strong>{metric.value}</strong>
+          </article>
+        ))}
+      </div>
+    </header>
+  );
+}
+
+function resolveTransferState(
+  mandatoryTransfers: readonly MandatoryTransferRecord[],
+  transferPeriod: TransferPeriodSnapshot,
+): TransferState {
+  if (mandatoryTransfers.length > 0) {
+    return "MANDATORY";
+  }
+
+  if (transferPeriod.status === "OPEN" && transferPeriod.activePhase === "SUMMER") {
+    return "SUMMER";
+  }
+
+  if (transferPeriod.status === "OPEN" && transferPeriod.activePhase === "WINTER") {
+    return "WINTER";
+  }
+
+  return "CLOSED";
+}
+
+function currentTransferPeriodLabel(transferPeriod: TransferPeriodSnapshot) {
+  if (transferPeriod.status === "OPEN" && transferPeriod.activePhase === "SUMMER") {
+    return "Sommer offen";
+  }
+
+  if (transferPeriod.status === "OPEN" && transferPeriod.activePhase === "WINTER") {
+    return "Winter offen";
+  }
+
+  return "Geschlossen";
+}
+
+function nextExpectedTransferPeriodLabel(transferPeriod: TransferPeriodSnapshot) {
+  if (transferPeriod.activePhase === "SUMMER") {
+    return "Winter nach Freigabe";
+  }
+
+  if (transferPeriod.activePhase === "WINTER") {
+    return "Sommer nach Freigabe";
+  }
+
+  return "Nach Öffnung durch Spielleitung";
+}
+
+function withManagerContext(
+  href: string,
+  managerSeasonId?: string | null,
+  phase?: "SUMMER" | "WINTER" | null,
+) {
+  if (!managerSeasonId && !phase) {
+    return href;
+  }
+
+  const params = new URLSearchParams();
+
+  if (managerSeasonId) {
+    params.set("managerSeasonId", managerSeasonId);
+  }
+
+  if (phase) {
+    params.set("phase", phase);
+  }
+
+  return `${href}?${params.toString()}`;
+}
+
+function formatMarketValue(value: number): string {
+  return `${value.toLocaleString("de-DE", {
+    maximumFractionDigits: 1,
+    minimumFractionDigits: 0,
+  })} Mio. €`;
 }

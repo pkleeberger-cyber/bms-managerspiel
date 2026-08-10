@@ -2,6 +2,7 @@ import { PrismaClient } from "@prisma/client";
 
 const globalForPrisma = globalThis as unknown as {
   bmsPrisma?: PrismaClient | null;
+  bmsPrismaInitializationError?: unknown;
 };
 
 export function getPrismaClient(): PrismaClient | null {
@@ -12,6 +13,9 @@ export function getPrismaClient(): PrismaClient | null {
   const configuredUrl = getConfiguredDatabaseUrl();
   if (!configuredUrl) {
     globalForPrisma.bmsPrisma = null;
+    globalForPrisma.bmsPrismaInitializationError = new Error(
+      "DATABASE_URL, MONGODB_URI, or MONGDODB_URI is not configured.",
+    );
     return globalForPrisma.bmsPrisma;
   }
 
@@ -21,7 +25,9 @@ export function getPrismaClient(): PrismaClient | null {
     globalForPrisma.bmsPrisma = new PrismaClient({
       errorFormat: process.env.NODE_ENV === "production" ? "minimal" : "colorless",
     });
-  } catch {
+    globalForPrisma.bmsPrismaInitializationError = undefined;
+  } catch (error) {
+    globalForPrisma.bmsPrismaInitializationError = error;
     globalForPrisma.bmsPrisma = null;
   }
 
@@ -34,4 +40,8 @@ export function getConfiguredDatabaseUrl() {
     process.env.MONGODB_URI ??
     process.env.MONGDODB_URI
   );
+}
+
+export function getPrismaInitializationError() {
+  return globalForPrisma.bmsPrismaInitializationError;
 }

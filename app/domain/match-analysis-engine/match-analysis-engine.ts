@@ -1,6 +1,8 @@
 import {
+  OFFICIAL_LINEUP_IDS,
   OFFICIAL_STARTER_IDS,
   POSITION_ORDER,
+  getPositionForLineupId,
 } from "../lineup-engine";
 import type {
   CalculatedMatchLineupResult,
@@ -264,6 +266,24 @@ function getMissingPositions(
     }));
 }
 
+function getLineupWarnings(
+  lineup: CalculatedMatchLineupResult,
+  side: MatchTeamSide,
+): MatchAnalysis["matchFactors"]["lineupWarnings"] {
+  const occupiedSlots = new Set(
+    lineup.effectiveSquad.players.map((player) => player.lineupId),
+  );
+
+  return OFFICIAL_LINEUP_IDS
+    .filter((slotId) => !occupiedSlots.has(slotId))
+    .map((slotId) => ({
+      side,
+      slotId,
+      position: getPositionForLineupId(slotId),
+      message: `Slot ${slotId} fehlt / nicht gewertet`,
+    }));
+}
+
 function ruleTargetsMatch(
   rule: BmsRule,
   officialResult: OfficialMatchResult,
@@ -411,6 +431,10 @@ export function createMatchAnalysis(
       missingPositions: [
         ...getMissingPositions(fixture.homeTeam, "HOME"),
         ...getMissingPositions(fixture.awayTeam, "AWAY"),
+      ],
+      lineupWarnings: [
+        ...getLineupWarnings(fixture.homeTeam, "HOME"),
+        ...getLineupWarnings(fixture.awayTeam, "AWAY"),
       ],
       appliedRules: getAppliedRules(matchday, officialResult),
       manualPenalties: [

@@ -25,9 +25,15 @@ export const matchdayLifecycleTransitions: readonly MatchdayLifecycleTransition[
   },
   {
     from: "DATA_ENTRY_OPEN",
-    to: "DATA_ENTRY_COMPLETE",
+    to: "DATA_ENTERED",
     reason: "COMPLETE_DATA_ENTRY",
     requiresVersion: false,
+  },
+  {
+    from: "DATA_ENTERED",
+    to: "CALCULATED",
+    reason: "CALCULATION_COMPLETED",
+    requiresVersion: true,
   },
   {
     from: "DATA_ENTRY_COMPLETE",
@@ -37,9 +43,33 @@ export const matchdayLifecycleTransitions: readonly MatchdayLifecycleTransition[
   },
   {
     from: "CALCULATED",
-    to: "PUBLISHED_PRELIMINARY",
+    to: "PRELIMINARY_PUBLISHED",
     reason: "PRELIMINARY_PUBLICATION",
     requiresVersion: true,
+  },
+  {
+    from: "PRELIMINARY_PUBLISHED",
+    to: "MANUAL_REVIEW_CONFIRMED",
+    reason: "ADMIN_CORRECTION",
+    requiresVersion: false,
+  },
+  {
+    from: "MANUAL_REVIEW_CONFIRMED",
+    to: "CORRECTIONS_CONFIRMED",
+    reason: "ADMIN_CORRECTION",
+    requiresVersion: false,
+  },
+  {
+    from: "CORRECTIONS_CONFIRMED",
+    to: "OFFICIALLY_CLOSED",
+    reason: "OFFICIAL_PUBLICATION",
+    requiresVersion: true,
+  },
+  {
+    from: "OFFICIALLY_CLOSED",
+    to: "ARCHIVED",
+    reason: "SEASON_ARCHIVAL",
+    requiresVersion: false,
   },
   {
     from: "PUBLISHED_PRELIMINARY",
@@ -181,7 +211,11 @@ export function isVisiblePublishedStatus(
   status: MatchdayLifecycleStatus,
 ): boolean {
   return (
+    status === "PRELIMINARY_PUBLISHED" ||
     status === "PUBLISHED_PRELIMINARY" ||
+    status === "MANUAL_REVIEW_CONFIRMED" ||
+    status === "CORRECTIONS_CONFIRMED" ||
+    status === "OFFICIALLY_CLOSED" ||
     status === "PUBLISHED_OFFICIAL" ||
     status === "ARCHIVED"
   );

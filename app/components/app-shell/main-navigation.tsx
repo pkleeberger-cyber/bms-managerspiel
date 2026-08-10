@@ -29,10 +29,28 @@ export function MainNavigation() {
             href={item.href}
             key={item.href}
           >
+            <span aria-hidden="true">{getNavigationIcon(item.label)}</span>
             {item.label}
           </Link>
         ))}
       </div>
     </nav>
   );
+}
+
+function getNavigationIcon(label: string) {
+  switch (label) {
+    case "Mein Team":
+      return "🛡";
+    case "Wettbewerbe":
+      return "🏆";
+    case "News":
+      return "📰";
+    case "Forum":
+      return "💬";
+    case "Administration":
+      return "⚙";
+    default:
+      return "•";
+  }
 }

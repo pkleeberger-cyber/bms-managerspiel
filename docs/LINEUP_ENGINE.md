@@ -4,7 +4,49 @@
 
 The Lineup Engine is the deterministic foundation for BMS match results, analysis, tables, events, history, and records. It resolves the historically valid squad, selects the evaluated eleven, calculates player points, and applies matchday penalties.
 
-The domain module is located in `app/domain/lineup-engine/`. It has no React, database, external API, randomness, AI, or competition-specific behavior.
+The domain module is located in `app/domain/lineup-engine/`. It has no React,
+database, external API, randomness, AI, or hardcoded competition branches.
+
+## Competition scoring configuration
+
+`calculateMatchLineup()` accepts an optional `CompetitionScoringConfig`.
+`ProcessMatchdayInput` forwards the same config to every team in that matchday.
+
+The config identifies its `competitionId` and either a `phaseId` or `roundId`,
+then controls:
+
+- whether Kicker ratings are used;
+- an optional default rating;
+- appearance points without a source rating;
+- goal points without a source rating;
+- Team of the Week points;
+- yellow-red card points;
+- red-card points.
+
+When no config is supplied, `createDefaultCompetitionScoringConfig()` preserves
+normal league behavior:
+
+- Kicker ratings enabled;
+- no general default rating;
+- appearance without a rating disabled;
+- the existing goal/direct-red automatic-rating cases retained;
+- cards and Team of the Week enabled.
+
+The engine validates that the config competition matches the lineup input and
+that any configured default rating is a valid BMS rating.
+
+Competition-specific selection happens outside the engine. There is no branch
+such as `if Pokal round <= 2`.
+
+`pokalRoundsOneAndTwoScoringConfig` demonstrates the currently known Pokal
+model:
+
+- Kicker ratings disabled;
+- default rating `3.5`;
+- goals without ratings enabled;
+- cards enabled;
+- Team of the Week disabled;
+- appearance without ratings currently `false` and pending confirmation.
 
 ## Official lineup IDs
 
@@ -199,7 +241,9 @@ Player ties use the lower lineup ID. Position-group ties use goalkeeper, defence
 9. Calculate analysis statistics.
 10. Return `MatchLineupResult`.
 
-Competition-specific rules for league, second league, cup, European cup, and Supercup remain outside this domain module.
+Competition-specific rule selection for league, second league, cup, European
+cup, and Supercup remains outside this domain module. The selected scoring
+behavior enters only as data.
 
 ## Comprehensive fixture
 
